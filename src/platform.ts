@@ -1,19 +1,41 @@
-import { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
+import { API, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 
+import { Network } from './network/Network.js';
+import { FBXShutters } from './platformAccessoryFBXShutters.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-import { ExamplePlatformAccessory } from './platformAccessory.js';
+// import { FreeboxSession } from "./freeboxOS/FreeboxSession.js";
+import * as fs from 'fs';
+import * as path from 'path';
+import { FreeboxRequest } from './freeboxOS/FreeboxRequest.js';
+import { FBXSessionCredentials, FBXAuthInfo } from './freeboxOS/FreeboxSession.js';
+// import { AlarmController } from './controllers/AlarmController.js';
+import { FBXBlind, ShuttersController } from './controllers/ShuttersController.js';
+// import * as express from 'express';
+
 
 /**
- * HomebridgePlatform
+ * FreeboxPlatform
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
+export class FreeboxPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
+
+  private authInfo: FBXAuthInfo = {
+    app_token: '',
+    track_id: 0,
+  };
+
+  private readonly authFilePath: string;
+  // private router: express.Router;
+  private fbxNetwork: Network;
+  private fbxRequest: FreeboxRequest;
+  // private alarmController : AlarmController | null= null;
+  private shuttersController: ShuttersController | null = null;
 
   constructor(
     public readonly log: Logging,
@@ -23,18 +45,76 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     this.Service = api.hap.Service;
     this.Characteristic = api.hap.Characteristic;
 
+    this.authFilePath = path.join(this.api.user.storagePath(), 'freebox-auth.json');
+    const freeboxApiVersion :string = this.config.apiVersion;
+    const freeboxIPAddress :string = this.config.freeBoxAddress;
+
+    this.fbxNetwork = new Network(this.log);
+    this.fbxRequest = new FreeboxRequest(this.log, this.fbxNetwork, freeboxIPAddress, freeboxApiVersion);
+
+    // this.router = express.Router();
     this.log.debug('Finished initializing platform:', this.config.name);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
-    this.api.on('didFinishLaunching', () => {
+    this.api.on('didFinishLaunching', async () => {
       log.debug('Executed didFinishLaunching callback');
-      // run the method to discover / register your devices as accessories
-      this.discoverDevices();
+      const auth_sucess: boolean = await this.initializeAuth();
+      if (auth_sucess) {
+        // this.alarmController = new AlarmController(
+        //   this.log,
+        //freeboxIPAddress,
+        // freeboxApiVersion,
+        //   this.fbxRequest,
+        // );
+        this.shuttersController = new ShuttersController(
+          this.log,
+          this.fbxRequest,
+          freeboxIPAddress,
+          freeboxApiVersion,
+        );
+        // run the method to discover / register your devices as accessories
+        await this.discoverDevices();
+      } else {
+        this.log.error(`Could not authenticate as an app with Freebox. "${PLATFORM_NAME}" "${PLUGIN_NAME}" initialization failed`);
+      }
     });
   }
+
+
+
+  async initializeAuth(): Promise<boolean> {
+    if (fs.existsSync(this.authFilePath)) {
+      this.authInfo = JSON.parse(fs.readFileSync(this.authFilePath, 'utf-8'));
+      this.log.info('Auth info loaded from file.');
+    } else {
+      //
+    }
+    const result: boolean = await this.startFreeboxAuthentication(this.authInfo);
+    return result;
+  }
+
+  async startFreeboxAuthentication(
+    authInfo: FBXAuthInfo,
+    // token: string,
+    // trackId: number
+  ): Promise<boolean> {
+    const sessionCredentials: FBXSessionCredentials = await this.fbxRequest.freeboxAuth(authInfo); // token, trackId);
+    if (sessionCredentials.token !== null && sessionCredentials.token !== 'null') {
+      this.authInfo = {
+        app_token: sessionCredentials.token,
+        track_id: sessionCredentials.track_id,
+      };
+      fs.writeFileSync(this.authFilePath, JSON.stringify(this.authInfo));
+      return true;
+    }
+    this.log.error(`Could not authenticate as an app with Freebox. Received credential data ${JSON.stringify(sessionCredentials)}`);
+    return false;
+  }
+
+
 
   /**
    * This function is invoked when homebridge restores cached accessories from disk at startup.
@@ -52,45 +132,32 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
    * Accessories must only be registered once, previously created accessories
    * must not be registered again to prevent "duplicate UUID" errors.
    */
-  discoverDevices() {
+  async discoverDevices() {
+    this.log.info('Discover devices');
+    // if (this.alarmController === null){
+    //   throw new Error('Can\'t discover devices - Freebox Alarm Controller not instanciated');
+    // }
+    if (this.shuttersController === null) {
+      throw new Error('Can\'t discover devices - Freebox Shutters Controller not instanciated');
+    }
+    this.log.info('Get shutters/blinds');
+    const shutters: Array<FBXBlind> = await this.shuttersController.getBlinds();
+    this.log.info('Found from Freebox '+ shutters.length+ 'shutters');
+    for (const [index, shutter] of shutters.entries()) {
 
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-    ];
-
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
-
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
-
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
+      const uuid = this.api.hap.uuid.generate(shutter.nodeid + shutter.displayName);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
       if (existingAccessory) {
         // the accessory already exists
         this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
 
         // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
+        existingAccessory.context.device = shutter;
+        this.api.updatePlatformAccessories([existingAccessory]);
 
         // create the accessory handler for the restored accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
+        new FBXShutters(this, existingAccessory, this.shuttersController, index);
 
         // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
         // remove platform accessories when no longer present
@@ -98,18 +165,18 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
         // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
       } else {
         // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
+        this.log.info('Adding new accessory:', shutter.displayName);
 
         // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
+        const accessory = new this.api.platformAccessory(shutter.displayName, uuid);
 
         // store a copy of the device object in the `accessory.context`
         // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
+        accessory.context.device = shutter;
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
+        new FBXShutters(this, accessory, this.shuttersController, index);
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

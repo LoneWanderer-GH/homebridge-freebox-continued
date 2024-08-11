@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "FreeboxHome",
   "pluginType": "platform",
   "singular": true,
   "schema": {
@@ -7,9 +7,24 @@
     "properties": {
       "name": {
         "title": "Name",
+        "description": "FreeboxHome",
         "type": "string",
         "required": true,
-        "default": "Example Dynamic Platform"
+        "default": "FreeboxHome"
+      },
+      "apiVersion": {
+        "title": "Freebox API Version",
+        "description": "The Freebox API version to use. see http://mafreebox.freebox.fr/api_version",
+        "type": "string",
+        "required": true,
+        "default": "v8"
+      },
+      "freeBoxAddress": {
+        "title": "Freebox network address (name or IP)",
+        "description": "The Freebox address version to use. eg:\nhttp://mafreebox.freebox.fr/api_version \nhttp://192.168.0.1/api_version",
+        "type": "string",
+        "required": true,
+        "default": "mafreebox.freebox.fr"
       }
     }
   }

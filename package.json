@@ -1,32 +1,40 @@
 {
   "private": true,
-  "displayName": "Plugin Name",
-  "name": "homebridge-plugin-name",
-  "version": "1.0.0",
-  "description": "A short description about what your plugin does.",
-  "license": "Apache-2.0",
+  "displayName": "Freebox - Api V8",
+  "name": "homebridge-freebox-continued",
+  "version": "0.0.1",
+  "description": "Porting of the legacy Freebox Homebridge https://github.com/fbx/homebridge-freebox-home. Supports window covering/slats/shutters.",
+  "license": "MIT",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/USERNAME/GITHUB_PROJECT_NAME.git"
+    "url": "git+https://github.com/LoneWanderer-GH/homebridge-freebox-continued.git"
   },
   "bugs": {
-    "url": "https://github.com/USERNAME/GITHUB_PROJECT_NAME/issues"
+    "url": "https://github.com/LoneWanderer-GH/homebridge-freebox-continued/issues"
   },
   "engines": {
-    "node": "^18.20.4 || ^20.16.0 || ^22.5.1",
+    "node": "^18.20.4 || ^20.15.0 || ^20.16.0 || ^22.5.1",
     "homebridge": "^1.8.0 || ^2.0.0-beta.0"
   },
   "main": "dist/index.js",
   "scripts": {
     "lint": "eslint src/**/*.ts --max-warnings=0",
     "watch": "npm run build && npm link && nodemon",
+    "localPublish": "cp -r . /volume1/docker/homebridge/node_modules/homebridge-freebox-continued/",
     "build": "rimraf ./dist && tsc",
+    "buildPublishLocal": "npm run build && npm run lint && npm run localPublish",
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [
-    "homebridge-plugin"
+    "homebridge-plugin",
+    "freebox",
+    "freebox home",
+    "freebox delta"
   ],
+  "dependencies": {
+    "node-fetch": "^3.0.0"
+  },
   "devDependencies": {
     "@types/node": "^20.14.12",
     "@typescript-eslint/eslint-plugin": "^7.17.0",
