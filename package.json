@@ -19,11 +19,12 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "lint": "eslint src/**/*.ts --max-warnings=0 --fix",
+    "lint": "eslint src/**/*.ts --max-warnings=0",
+    "lintLocal": "eslint src/**/*.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
     "localPublish": "cp -r . /volume1/docker/homebridge/node_modules/homebridge-freebox-continued/",
     "build": "rimraf ./dist && tsc",
-    "buildPublishLocal": "npm run build && npm run lint && npm run localPublish",
+    "buildPublishLocal": "npm run build && npm run lintLocal && npm run localPublish",
     "prepublishOnly": "npm run lint && npm run build"
   },
   "keywords": [

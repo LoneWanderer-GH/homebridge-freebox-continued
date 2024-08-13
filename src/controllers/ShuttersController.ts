@@ -266,12 +266,16 @@ export class ShuttersController {
       'GET',
       null,
     );
-    if (rval !== null) {
-      if (rval.value_type === 'int') {
-        const v: number = parseInt(rval.value);
-        blind.current_position = v;
+    if (rval !== null && rval !== undefined) {
+      if (rval.value_type !== null && rval.value_type !== undefined) {
+        if (rval.value_type === 'int') {
+          const v: number = parseInt(rval.value);
+          blind.current_position = v;
+        } else {
+          throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
+        }
       } else {
-        throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
+        throw new EvalError(`Expected int type for result... no value type defined ?! ${JSON.stringify(rval)}`);
       }
     }
     return { value: blind.current_position };

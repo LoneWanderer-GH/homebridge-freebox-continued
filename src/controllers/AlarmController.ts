@@ -5,9 +5,9 @@ import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
 
 export enum AlarmKind {
-  NO_ALARM = 0,
-  MAIN_ALARM = 1,
-  NIGHT_ALARM = 2,
+  OFF = 'off',
+  MAIN_ALARM = 'alarm1', //1,
+  NIGHT_ALARM = 'alarm2', //2,
 }
 
 export enum AlarmState {
@@ -30,10 +30,13 @@ export enum AlarmState {
 }
 
 export class AlarmController {
-  private storedAlarmTarget: AlarmKind = AlarmKind.NO_ALARM;
+  private storedAlarmTarget: AlarmKind = AlarmKind.OFF;
   private storedAlarmNode: FBXHomeNode | null = null;
   private isArming: boolean = false;
   private freeboxRequest!: FreeboxRequest;
+
+  private alarmKindEndPointsMap: Map<AlarmKind, number>= new Map<AlarmKind, number>();
+  private stateEndPoint : number = -1;
 
   constructor(
     public readonly log: Logging,
@@ -43,6 +46,11 @@ export class AlarmController {
     private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
+    // this.alarmKindEndPointsMap = {
+    //   AlarmKind.alarm1 =  -1,
+    //   AlarmKind.alarm2 =  -1,
+    //   AlarmKind.off =  -1,
+    // };
     this.debug('Create Alarm controller');
   }
 
@@ -86,6 +94,21 @@ export class AlarmController {
       if (node.category === FBXHomeNodeCategory.alarm) { //=== 'alarm') {
         this.storedAlarmNode = node;
         this.success(`Found alarm node ! ${node.name} ${node.label}`);
+        for (const ep of this.storedAlarmNode.type.endpoints) {
+          if (ep.name !== null) {
+            if (ep.name === 'alarm1') {
+              this.alarmKindEndPointsMap.set(AlarmKind.MAIN_ALARM, ep.id);
+            } else if (ep.name === 'alarm2') {
+              this.alarmKindEndPointsMap.set(AlarmKind.NIGHT_ALARM, ep.id);
+            } else if (ep.name === 'off') {
+              this.alarmKindEndPointsMap.set(AlarmKind.OFF, ep.id);
+            } else if (ep.name === 'state') {
+              this.stateEndPoint = ep.id;
+            } else {
+              continue;
+            }
+          }
+        }
         return node;
       }
     }
@@ -99,8 +122,8 @@ export class AlarmController {
 
   async refreshAlarmTarget() {
     if (this.storedAlarmNode) {
-      const ep_id = this.getStateEndpoint();
-      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      // const ep_id = this.getStateEndpoint();
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${this.stateEndPoint}`;
       const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.NO_RETRY);
       const data: FBXEndPointResult = result.data as FBXEndPointResult;
       if (result && data.success) {
@@ -113,7 +136,7 @@ export class AlarmController {
         } else if (value.includes('alarm2')) {
           this.storedAlarmTarget = AlarmKind.NIGHT_ALARM;
         } else {
-          this.storedAlarmTarget = AlarmKind.NO_ALARM;
+          this.storedAlarmTarget = AlarmKind.OFF;
         }
       }
       //   const _res = await sleep(10000, '');
@@ -124,30 +147,31 @@ export class AlarmController {
       //   if (alarmNode) {
       //     this.storedAlarmNode = alarmNode;
       //     this.refreshAlarmTarget();
-      this.warn('No alarm node found yet ... Did discovery happened yet ?!');
+      throw new Error('No alarm node found yet ... Did discovery happened yet ?!');
     }
     return this.storedAlarmTarget;
   }
 
-  private getMainEndpoint(): number {
-    return this.getEndpointIdWithName('alarm1');
-  }
+  // private getMainEndpoint(): number {
+  //   return this.getEndpointIdWithName('alarm1');
+  // }
 
-  private getSecondaryEndpoint(): number{
-    return this.getEndpointIdWithName('alarm2');
-  }
+  // private getSecondaryEndpoint(): number {
+  //   return this.getEndpointIdWithName('alarm2');
+  // }
 
-  private getAlarmKindEndpoint(kind: AlarmKind): number {
-    return this.getEndpointIdWithName(AlarmKind[kind]);
-  }
+  // private getAlarmKindEndpoint(kind: AlarmKind): number {
+  //   // return this.getEndpointIdWithName(kind);
+  //   return this.alarmKindEndPointsMap[kind];
+  // }
 
-  private getOffEndpoint(): number {
-    return this.getEndpointIdWithName('off');
-  }
+  // private getOffEndpoint(): number {
+  //   return this.getEndpointIdWithName('off');
+  // }
 
-  private getStateEndpoint(): number {
-    return this.getEndpointIdWithName('state');
-  }
+  // private getStateEndpoint(): number {
+  //   return this.getEndpointIdWithName('state');
+  // }
 
   private getEndpointIdWithName(name: string): number {
     if (this.storedAlarmNode) {
@@ -194,8 +218,8 @@ export class AlarmController {
 
   async getAlarmState(): Promise<AlarmState | null> {
     if (this.storedAlarmNode) {
-      const ep_id = this.getStateEndpoint();
-      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      // const ep_id = this.getStateEndpoint();
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${this.stateEndPoint}`;
       const _payload = {
         id: this.storedAlarmNode.id,
         value: null,
@@ -203,7 +227,7 @@ export class AlarmController {
       const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.NO_RETRY);
       const data: FBXEndPointResult = result.data as FBXEndPointResult;
       if (result && data.success) {
-        const value = AlarmState[data.result.value as keyof typeof AlarmState];
+        const value = data.result.value as AlarmState; //AlarmState[data.result.value as keyof typeof AlarmState];
         switch (value) {
           //if (value === 'alarm1_armed' || value === 'alarm1_arming') {
           case AlarmState.MAIN_alarm_armed:
@@ -222,7 +246,7 @@ export class AlarmController {
             this.isArming = true;
             break;
           case AlarmState.idle:
-            this.storedAlarmTarget = AlarmKind.NO_ALARM;
+            this.storedAlarmTarget = AlarmKind.OFF;
             this.isArming = false;
             break;
           default:
@@ -252,11 +276,31 @@ export class AlarmController {
     return this.storedAlarmTarget;
   }
 
+  // async setAlarmDisabled(): Promise<boolean> {
+  //   if (this.storedAlarmNode) {
+  //     const ep_id = this.getOffEndpoint();
+  //     const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+  //     const result: FBXRequestResult = await this.freeboxRequest.request(
+  //       'PUT',
+  //       url,
+  //       { id: this.storedAlarmNode.id, value: null },
+  //       RetryPolicy.NO_RETRY,
+  //     );
+  //     const data: FBXEndPointResult = result.data as FBXEndPointResult;
+  //     if (result && data.success) {
+  //       this.storedAlarmTarget = AlarmKind.OFF;
+  //       return true;
+  //     } else {
+  //       return false;
+  //     }
+  //   } else {
+  //     return false;
+  //   }
+  // }
+
   async setAlarmDisabled(): Promise<boolean> {
     if (this.storedAlarmNode) {
-      const ep_id = this.getOffEndpoint();
-      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
-      this.storedAlarmTarget = AlarmKind.NO_ALARM;
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${this.alarmKindEndPointsMap.get(AlarmKind.OFF)}`;
       const result: FBXRequestResult = await this.freeboxRequest.request(
         'PUT',
         url,
@@ -265,6 +309,7 @@ export class AlarmController {
       );
       const data: FBXEndPointResult = result.data as FBXEndPointResult;
       if (result && data.success) {
+        this.storedAlarmTarget = AlarmKind.OFF;
         return true;
       } else {
         return false;
@@ -274,21 +319,20 @@ export class AlarmController {
     }
   }
 
+
   private async setAlarm(kind: AlarmKind): Promise<boolean> {
     switch (kind) {
       case AlarmKind.MAIN_ALARM:
       case AlarmKind.NIGHT_ALARM:
         break;
-      case AlarmKind.NO_ALARM:
-        this.error(`Cant' set alarm for ${kind}`);
-        return false;
       default:
-        this.error(`Cant' set alarm for ${kind}`);
-        return false;
+        // this.error(`Cant' set alarm for ${kind}`);
+        // return false;
+        throw Error('Wrong service called, should use setAlarmDisabled');
     }
     const activable: boolean = await this.checkAlarmActivable(kind);
     if (activable && this.storedAlarmNode) {
-      const ep_id = this.getAlarmKindEndpoint(kind);
+      const ep_id = this.alarmKindEndPointsMap.get(kind);
       const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
       this.storedAlarmTarget = kind;
       const result: FBXRequestResult = await this.freeboxRequest.request(
@@ -310,43 +354,10 @@ export class AlarmController {
   }
 
   async setMainAlarm(): Promise<boolean> {
-    // const activable: boolean = await this.checkAlarmActivable(AlarmKind.MAIN_ALARM);
-    // if (activable && this.storedAlarmNode) {
-    //   const ep_id = this.getMainEndpoint();
-    //   const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
-    //   this.storedAlarmTarget = AlarmKind.MAIN_ALARM;
-    //   const result: FBXRequestResult = await this.freeboxRequest.request('PUT', url,
-    //     { id: this.storedAlarmNode.id, value: null }); //, (statusCode, body) => {
-    //   const data: FBXEndPointResult = result.data as FBXEndPointResult;
-    //   if (result && data.success) {
-    //     return true;
-    //   } else {
-    //     return false;
-    //   }
-    // } else {
-    //   this.info(`Alarm ${AlarmKind.MAIN_ALARM} not activable ${activable} or no alarm node found...`);
-    //   return false;
-    // }
     return await this.setAlarm(AlarmKind.MAIN_ALARM);
   }
 
   async setNightAlarm(): Promise<boolean> {
-    // const activable: boolean = await this.checkAlarmActivable(AlarmKind.NIGHT_ALARM);
-    // if (activable && this.storedAlarmNode) {
-    //   const ep_id = this.getSecondaryEndpoint();
-    //   const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
-    //   this.storedAlarmTarget = AlarmKind.NIGHT_ALARM;
-    //   const result: FBXRequestResult = await this.freeboxRequest.request('PUT', url, { id: this.storedAlarmNode.id, value: null });
-    //   const data: FBXEndPointResult = result.data as FBXEndPointResult;
-    //   if (result && data.success) {
-    //     return true;
-    //   } else {
-    //     return false;
-    //   }
-    // } else {
-    //   this.info(`Alarm ${AlarmKind.MAIN_ALARM} not activable ${activable} or no alarm node found...`);
-    //   return false;
-    // }
     return await this.setAlarm(AlarmKind.NIGHT_ALARM);
   }
 }

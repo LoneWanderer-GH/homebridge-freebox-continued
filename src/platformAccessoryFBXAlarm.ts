@@ -27,11 +27,14 @@ export class FBXAlarm {
   ) {
     this.currentState = this.platform.Characteristic.SecuritySystemCurrentState.DISARMED;
     this.currentTargetState = this.platform.Characteristic.SecuritySystemTargetState.DISARM;
-
+    // static readonly STAY_ARM = 0;
+    // static readonly AWAY_ARM = 1;
+    // static readonly NIGHT_ARM = 2;
+    // static readonly DISARM = 3;
     this.currentTargetStateF2H = {
-      [FBXAlarmKind.MAIN_ALARM]: 'AWAY',
-      [FBXAlarmKind.NIGHT_ALARM]: 'NIGHT',
-      [FBXAlarmKind.NO_ALARM]: 'STAY',
+      [FBXAlarmKind.MAIN_ALARM]: 1, //'AWAY',
+      [FBXAlarmKind.NIGHT_ALARM]: 2, // 'NIGHT',
+      [FBXAlarmKind.OFF]: 3, //'DISARM',
     }
     this.currentStateF2H = {
       [FBXAlarmState.idle]: this.platform.Characteristic.SecuritySystemCurrentState.DISARMED,
@@ -135,7 +138,7 @@ export class FBXAlarm {
         //   [FBXAlarmState.NIGHT_alarm_alert_timer /*'alarm2_alert_timer'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         //   [FBXAlarmState.alert /*'alert'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         // };
-        this.debug(`FBX alarm state ${alarmState} converting to ${this.currentStateF2H[alarmState]}`);
+        //this.debug(`FBX alarm state ${alarmState} converting to ${this.currentStateF2H[alarmState]}`);
         this.currentState = this.currentStateF2H[alarmState];
       }
     }, 8000);
@@ -164,7 +167,7 @@ export class FBXAlarm {
    * Handle requests to get the current value of the "Security System Current State" characteristic
    */
   async getSecuritySystemTargetState(): Promise<CharacteristicValue> {
-    this.debug('Triggered GET SecuritySystemCurrentState');
+    this.debug(`Triggered GET getSecuritySystemTargetState -> returning ${this.currentTargetState}`);
     return this.currentTargetState;
   }
 
@@ -176,6 +179,7 @@ export class FBXAlarm {
     switch (value) {
       case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
         {
+          this.debug(`DISARM`);
           const status = await this.alarmController.setAlarmDisabled();
           if (status) {
             this.currentTargetState = value;
@@ -184,6 +188,7 @@ export class FBXAlarm {
         }
       case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
         {
+          this.debug(`ARM`);
           const status = await this.alarmController.setMainAlarm();
           if (status) {
             this.currentTargetState = value;
@@ -193,12 +198,15 @@ export class FBXAlarm {
       case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
       case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
         {
+          this.debug(`STAY OR NIGHT ARM`);
           const status = await this.alarmController.setNightAlarm();
           if (status) {
             this.currentTargetState = value;
           }
           break;
         }
+      default:
+        this.debug(`WTF BBQ !!!`);
     }
   }
 
@@ -206,7 +214,7 @@ export class FBXAlarm {
    * Handle requests to get the current value of the "Security System Current State" characteristic
    */
   async getSecuritySystemCurrentState(): Promise<CharacteristicValue> {
-    this.debug(`Triggered getSecuritySystemCurrentState -> ${this.currentState}`);
+    this.debug(`Triggered getSecuritySystemCurrentState -> returning ${this.currentState}`);
     return this.currentState;
   }
 

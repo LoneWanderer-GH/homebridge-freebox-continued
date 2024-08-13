@@ -65,10 +65,12 @@ export class Network {
     // try{
     if (!response.ok) {
       await this.handleHTTPErrorCodes(response, url, method, body);
+      return { status_code: response.status, data: {error_code: 'retry_later'}};
+    } else {
+      const jsonData = await response.json();
+      this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
+      return { status_code: response.status, data: jsonData };
     }
-    const jsonData = await response.json();
-    this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
-    return { status_code: response.status, data: jsonData };
     // } catch (error) {
     //   this.error(JSON.stringify(error));
     //   return { status_code: null, data: null };
@@ -81,7 +83,7 @@ export class Network {
 
   private async handleHTTPErrorCodes(response: NodeFetchResponse, url: string, method: string, body: unknown) {
     const debug_str_prefix = `${method} ${url}`;
-    this.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + response.statusText);
+    this.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + ' ' + response.statusText);
     const errortext = await response.text();
     this.error('\n' + errortext);
     if (response.status === 500) {
@@ -93,7 +95,7 @@ export class Network {
     } else if (response.status === 503) {
       this.handleHTTPError503(response, errortext);
     } else if (response.status === 504) {
-      this.handleHTTPError504(response, errortext);
+      await this.handleHTTPError504(response, errortext);
     } else {
       this.handleOtherHTTPErrors(response, errortext);
     }
@@ -130,22 +132,28 @@ export class Network {
   }
 
   private handleHTTPError500(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. Internal error 500 Internal Server Error`);
+    throw new Error(`${response.status}. ${response.statusText}`);
   }
 
   private handleHTTPError501(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. Internal error 501 Not Implemented`);
+    throw new Error(`${response.status}. ${response.statusText}`);
   }
 
   private handleHTTPError502(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. Internal error 502 Bad Gateway or Proxy Error`);
+    throw new Error(`${response.status}. ${response.statusText}`);
   }
 
   private handleHTTPError503(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. Internal error 503 Service Unavailable`);
+    throw new Error(`${response.status}. ${response.statusText}`);
   }
 
-  private handleHTTPError504(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. Internal error 504 Gateway Time-out`);
+  private async handleHTTPError504(_response: NodeFetchResponse, _errortext: string) {
+    // throw new Error(`${response.status}. ${response.statusText}`);
+    this.warn('Force a delay');
+    await this.delay(5000);
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
