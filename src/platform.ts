@@ -10,11 +10,11 @@ import { FreeboxRequest } from './freeboxOS/FreeboxRequest.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession } from './freeboxOS/FreeboxSession.js';
 // import { AlarmController } from './controllers/AlarmController.js';
 import { AlarmController } from './controllers/AlarmController.js';
+import { NodesController } from './controllers/NodesController.js';
 import { FBXBlind, ShuttersController } from './controllers/ShuttersController.js';
 import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
-import { FBXAlarm } from './platformAccessoryFBXAlarm.js';
 import { FreeboxController } from './freeboxOS/FreeboxApi.js';
-import { NodesController } from './controllers/NodesController.js';
+import { FBXAlarm } from './platformAccessoryFBXAlarm.js';
 // import * as express from 'express';
 
 
@@ -38,7 +38,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
   private readonly authFilePath: string;
   // private router: express.Router;
   private fbxNetwork: Network;
-  private fbxAPIController:FreeboxController;
+  private fbxAPIController: FreeboxController;
   // private fbxRequest: FreeboxRequest | null;
   // private fbxSession : FreeboxSession | null;
   private alarmController: AlarmController | null = null;
@@ -73,12 +73,12 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', async () => {
       log.debug('Executed didFinishLaunching callback');
 
-      const apiUrl : string = await this.fbxAPIController.getActualApiUrl();
+      const apiUrl: string = await this.fbxAPIController.getActualApiUrl();
 
       const fbxSession = new FreeboxSession(this.log, this.fbxNetwork, apiUrl); // this.freeboxAddress, this.freeboxApiVersion);
-      const fbxRequest = new FreeboxRequest(this.log, this.fbxNetwork, fbxSession) ; // freeboxIPAddress, freeboxApiVersion);
+      const fbxRequest = new FreeboxRequest(this.log, this.fbxNetwork, fbxSession); // freeboxIPAddress, freeboxApiVersion);
       const nodesCtrl = new NodesController(this.log, fbxRequest, apiUrl);
-      
+
       const auth_sucess: boolean = await this.initializeAuth(fbxRequest);
       if (auth_sucess) {
 
@@ -107,7 +107,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
 
 
   async initializeAuth(
-    fbxRequest:FreeboxRequest,
+    fbxRequest: FreeboxRequest,
   ): Promise<boolean> {
     if (fs.existsSync(this.authFilePath)) {
       this.authInfo = JSON.parse(fs.readFileSync(this.authFilePath, 'utf-8'));
@@ -121,7 +121,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
   }
 
   async startFreeboxAuthentication(
-    fbxRequest:FreeboxRequest,
+    fbxRequest: FreeboxRequest,
     authInfo: FBXAuthInfo,
     // token: string,
     // trackId: number
@@ -157,9 +157,9 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
    * Accessories must only be registered once, previously created accessories
    * must not be registered again to prevent "duplicate UUID" errors.
    */
-  async discoverDevices(nodesCtrl:NodesController) {
+  async discoverDevices(nodesCtrl: NodesController) {
     this.log.info('Discover devices');
-    const nodes : Array<FBXHomeNode> = await nodesCtrl.getNodes();
+    const nodes: Array<FBXHomeNode> = await nodesCtrl.getNodes();
     await this.discoverShutters(nodes);
     await this.discoverAlarms(nodes);
   }
@@ -229,7 +229,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
       throw new Error('Can\'t discover devices - Freebox Alarm Controller not instanciated');
     }
     const alarmNode: FBXHomeNode | null = this.alarmController.getAlarm(nodes);
-    
+
     if (alarmNode !== null) {
       const uuid = this.api.hap.uuid.generate(alarmNode.id + alarmNode.name);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
@@ -267,7 +267,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
         new FBXAlarm(this,
           accessory,
           this.alarmController);
-              
+
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }

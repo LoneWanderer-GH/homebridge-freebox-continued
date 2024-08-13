@@ -51,13 +51,13 @@ export class Network {
         headers: headers,
         body: JSON.stringify(body),
       };
-      this.debug(`${debug_str_prefix}\n\t|-> request:\n\t${JSON.stringify(body)}`);
+      this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
     } else {
       request = {
         method: method,
         headers: headers,
       };
-      this.debug(`${debug_str_prefix}\n\t|-> request: (no body)`);
+      this.debug(`${debug_str_prefix} -> request: (no body)`);
     }
     const response: NodeFetchResponse = await fetch(url, request);
     // const clone = response.clone();
@@ -67,7 +67,7 @@ export class Network {
       await this.handleHTTPErrorCodes(response, url, method, body);
     }
     const jsonData = await response.json();
-    this.debug(`${debug_str_prefix}\n\t|-> response (json):\n\t${JSON.stringify(jsonData)}`);
+    this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
     return { status_code: response.status, data: jsonData };
     // } catch (error) {
     //   this.error(JSON.stringify(error));
@@ -107,10 +107,10 @@ export class Network {
     //   } else {
     //     // that was a JSON ?!
     //     const jsonData = await response.json();
-    //     throw new Error(`Error: ${response.status}. ${JSON.stringify(jsonData)}`);
+    //     throw new Error(`${response.status}. ${JSON.stringify(jsonData)}`);
     //   }
     // } else {
-    //   throw new Error(`Error: ${response.status}.Weird header content-type ... ${replyContentType}`);
+    //   throw new Error(`${response.status}.Weird header content-type ... ${replyContentType}`);
     // }
   }
   // private async handleReplyIsNotJSON(response: NodeFetchResponse) {
@@ -126,26 +126,26 @@ export class Network {
   private handleOtherHTTPErrors(response: NodeFetchResponse, errortext: string) {
     this.error(JSON.stringify(response.headers.raw()['content-type']));
     this.error(errortext);
-    throw new Error(`Error: ${response.status}. Got a non-JSON  reply!\n\n${errortext}`);
+    throw new Error(`${response.status}. Got a non-JSON  reply!\n\n${errortext}`);
   }
 
   private handleHTTPError500(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`Error: ${response.status}. Internal error 500 Internal Server Error`);
+    throw new Error(`${response.status}. Internal error 500 Internal Server Error`);
   }
 
   private handleHTTPError501(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`Error: ${response.status}. Internal error 501 Not Implemented`);
+    throw new Error(`${response.status}. Internal error 501 Not Implemented`);
   }
 
   private handleHTTPError502(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`Error: ${response.status}. Internal error 502 Bad Gateway or Proxy Error`);
+    throw new Error(`${response.status}. Internal error 502 Bad Gateway or Proxy Error`);
   }
 
   private handleHTTPError503(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`Error: ${response.status}. Internal error 503 Service Unavailable`);
+    throw new Error(`${response.status}. Internal error 503 Service Unavailable`);
   }
 
   private handleHTTPError504(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`Error: ${response.status}. Internal error 504 Gateway Time-out`);
+    throw new Error(`${response.status}. Internal error 504 Gateway Time-out`);
   }
 }

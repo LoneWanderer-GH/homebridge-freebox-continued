@@ -135,6 +135,7 @@ export class FBXAlarm {
         //   [FBXAlarmState.NIGHT_alarm_alert_timer /*'alarm2_alert_timer'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         //   [FBXAlarmState.alert /*'alert'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         // };
+        this.debug(`FBX alarm state ${alarmState.toString()} converting to ${this.currentStateF2H[alarmState].toString()}`);
         this.currentState = this.currentStateF2H[alarmState];
       }
     }, 8000);
@@ -205,6 +206,7 @@ export class FBXAlarm {
    * Handle requests to get the current value of the "Security System Current State" characteristic
    */
   async getSecuritySystemCurrentState(): Promise<CharacteristicValue> {
+    this.debug(`Triggered getSecuritySystemCurrentState -> ${this.currentState}`);
     return this.currentState;
   }
 
