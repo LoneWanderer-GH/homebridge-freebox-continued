@@ -1,5 +1,5 @@
 import { Logging } from 'homebridge';
-// import { setTimeout as sleep } from 'timers/promises';
+import { setTimeout as sleep } from 'timers/promises';
 import {
   FBXEndPointResult,
   FBXHomeNode,
@@ -244,13 +244,22 @@ export class ShuttersController {
       'GET', // get the write data in GET mode ?!
       null,
     );
-    if (rval !== null) {
-      if (rval.value_type === 'int') {
-        const v: number = parseInt(rval.value);
-        blind.current_target_position = v;
-        // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
+    if (rval !== null && rval !== undefined) {
+      if (rval.value_type !== null && rval.value_type !== undefined) {
+        if (rval.value_type === 'int') {
+          const v: number = parseInt(rval.value);
+          blind.current_target_position = v;
+          // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
+        } else {
+          throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
+        }
       } else {
-        throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
+        throw new EvalError(`No value type in reply ? ${JSON.stringify(rval)}`);
+      }
+      if (rval.refresh !== null && rval.refresh !== undefined) {
+        this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+        this.debug('sleep for '+ rval.refresh+ ' ms');
+        await sleep(rval.refresh, '');
       }
     }
     return { value: blind.current_target_position };
@@ -276,6 +285,11 @@ export class ShuttersController {
         }
       } else {
         throw new EvalError(`Expected int type for result... no value type defined ?! ${JSON.stringify(rval)}`);
+      }
+      if (rval.refresh !== null && rval.refresh !== undefined) {
+        this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+        this.debug('sleep for '+ rval.refresh+ ' ms');
+        await sleep(rval.refresh, '');
       }
     }
     return { value: blind.current_position };
