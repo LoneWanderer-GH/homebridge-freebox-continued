@@ -34,14 +34,14 @@ export class FBXAlarm {
       [FBXAlarmKind.NO_ALARM]: 'STAY',
     }
     this.currentStateF2H = {
-      [FBXAlarmState.idle /*"idle"*/]: this.platform.Characteristic.SecuritySystemCurrentState.DISARMED,
-      [FBXAlarmState.MAIN_alarm_arming /*'alarm1_arming'*/]: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM,
-      [FBXAlarmState.NIGHT_alarm_arming /*'alarm2_arming'*/]: this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM,
-      [FBXAlarmState.MAIN_alarm_armed /*'alarm1_armed'*/]: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM,
-      [FBXAlarmState.NIGHT_alarm_armed /*'alarm2_armed'*/]: this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM,
-      [FBXAlarmState.MAIN_alarm_alert_timer /*'alarm1_alert_timer'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
-      [FBXAlarmState.NIGHT_alarm_alert_timer /*'alarm2_alert_timer'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
-      [FBXAlarmState.alert /*'alert'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
+      [FBXAlarmState.idle]: this.platform.Characteristic.SecuritySystemCurrentState.DISARMED,
+      [FBXAlarmState.MAIN_alarm_arming]: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM,
+      [FBXAlarmState.NIGHT_alarm_arming]: this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM,
+      [FBXAlarmState.MAIN_alarm_armed]: this.platform.Characteristic.SecuritySystemCurrentState.AWAY_ARM,
+      [FBXAlarmState.NIGHT_alarm_armed]: this.platform.Characteristic.SecuritySystemCurrentState.NIGHT_ARM,
+      [FBXAlarmState.MAIN_alarm_alert_timer]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
+      [FBXAlarmState.NIGHT_alarm_alert_timer]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
+      [FBXAlarmState.alert]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
     };
 
     // set accessory information
@@ -135,7 +135,7 @@ export class FBXAlarm {
         //   [FBXAlarmState.NIGHT_alarm_alert_timer /*'alarm2_alert_timer'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         //   [FBXAlarmState.alert /*'alert'*/]: this.platform.Characteristic.SecuritySystemCurrentState.ALARM_TRIGGERED,
         // };
-        this.debug(`FBX alarm state ${alarmState.toString()} converting to ${this.currentStateF2H[alarmState].toString()}`);
+        this.debug(`FBX alarm state ${alarmState} converting to ${this.currentStateF2H[alarmState]}`);
         this.currentState = this.currentStateF2H[alarmState];
       }
     }, 8000);
@@ -174,7 +174,6 @@ export class FBXAlarm {
   async setSecuritySystemTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
     this.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
     switch (value) {
-      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
       case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
         {
           const status = await this.alarmController.setAlarmDisabled();
@@ -191,6 +190,7 @@ export class FBXAlarm {
           }
           break;
         }
+      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
       case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
         {
           const status = await this.alarmController.setNightAlarm();

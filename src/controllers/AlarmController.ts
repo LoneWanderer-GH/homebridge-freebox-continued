@@ -129,27 +129,27 @@ export class AlarmController {
     return this.storedAlarmTarget;
   }
 
-  private getMainEndpoint(): number | undefined {
+  private getMainEndpoint(): number {
     return this.getEndpointIdWithName('alarm1');
   }
 
-  private getSecondaryEndpoint(): number | undefined {
+  private getSecondaryEndpoint(): number{
     return this.getEndpointIdWithName('alarm2');
   }
 
-  private getAlarmKindEndpoint(kind: AlarmKind): number | undefined {
-    return this.getEndpointIdWithName(kind.toString());
+  private getAlarmKindEndpoint(kind: AlarmKind): number {
+    return this.getEndpointIdWithName(AlarmKind[kind]);
   }
 
-  private getOffEndpoint(): number | undefined {
+  private getOffEndpoint(): number {
     return this.getEndpointIdWithName('off');
   }
 
-  private getStateEndpoint(): number | undefined {
+  private getStateEndpoint(): number {
     return this.getEndpointIdWithName('state');
   }
 
-  private getEndpointIdWithName(name: string): number | undefined {
+  private getEndpointIdWithName(name: string): number {
     if (this.storedAlarmNode) {
       let id = 0;
       for (const endpoint of this.storedAlarmNode.type.endpoints) {
@@ -160,6 +160,7 @@ export class AlarmController {
         }
       }
     }
+    throw Error(`endpoint with name ${name} not found ...`);
   }
 
   private async checkAlarmActivable(target: AlarmKind): Promise<boolean> {
