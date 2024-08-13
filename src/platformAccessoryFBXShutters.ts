@@ -33,6 +33,7 @@ export class FBXShutters {
     private readonly accessory: PlatformAccessory,
     private readonly shuttersController: ShuttersController,
     private readonly controllerShutterIndex: number,
+    private readonly shuttersRefreshRateMilliSeconds: number,
   ) {
     this.shutterDevice = accessory.context.device as FBXBlind;
     this.platform.log.info('Create shutter ' + this.shutterDevice.displayName + ' ' + this.shutterDevice.nodeid);
@@ -74,6 +75,7 @@ export class FBXShutters {
       .onSet(this.setTargetPosition.bind(this));
     // .on('set', this.handleTargetPositionSet.bind(this));
 
+    // useless in Homekit ?
     // this.service.getCharacteristic(this.platform.Characteristic.HoldPosition)
     //   .onSet(this.setHoldPosition.bind(this));
     // // .on('set', this.handleHoldPositionSet.bind(this));
@@ -112,7 +114,7 @@ export class FBXShutters {
       await this.updateCurrentPosition(false);
       const gotCurrentTargetPos = await this.updateCurrentTargetPosition(false);
       if (!gotCurrentTargetPos) {
-        this.platform.log.warn("Could not find a initial target position");
+        this.warn("Could not find a initial target position");
       }
     });
 
@@ -124,72 +126,55 @@ export class FBXShutters {
 
     this.platform.log.info('Start periodic timer');
     setInterval(async () => {
-      // this.platform.log.debug(`${this.debugName} - Periodic shutter position GET`);
-      // try {
-      // const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.controllerShutterIndex);
-      // if (currentPos.value !== null) {
-      //   // apple convention  : 100 = OPEN / 0 = CLOSED
-      //   // Freebox convention: 100 = CLOSED / 0 = OPEN
-      //   const apple_convention_pos: number = 100 - currentPos.value;
-      //   this.platform.log.debug(`${this.debugName} - position ${apple_convention_pos} (apple convention)`);
-      //   this.previousPosition = this.currentPosition;
-      //   this.currentPosition = apple_convention_pos;
-      // }
       await this.updateCurrentPosition();
-      // const currentTargetPos: BlindPosValue = await this.shuttersController.getBlindTargetPosition(this.controllerShutterIndex);
-      // if (currentTargetPos.value !== null) {
-      //   const apple_convention_pos: number = 100 - currentTargetPos.value;
-      //   this.previousTargetPosition = this.currentTargetPosition;
-      //   this.currentTargetPosition = apple_convention_pos;
-      //   this.service.updateCharacteristic(this.platform.Characteristic.TargetPosition, this.currentTargetPosition);
-      // }
-      await this.updateCurrentTargetPosition();
-
-      // if (trend === this.platform.Characteristic.PositionState.STOPPED) {
-      //   this.currentTargetPosition = this.currentPosition;
-      // }
-
-
-      //   if (currentPos.value !== null) {
-      //     // apple convention  : 100 = OPEN / 0 = CLOSED
-      //     // Freebox convention: 100 = CLOSED / 0 = OPEN
-      //     //switch to FBX convention
-      //     const fbx_convention_pos: number = 100 - currentPos.value;
-      //     if (fbx_convention_pos !== this.previousPosition) {
-      //       this.platform.log.warn(`${this.debugName} - New shutter position = ${fbx_convention_pos} (previous=${this.previousPosition})`);
-      //       this.previousPosition = this.currentPosition;
-      //       this.currentPosition = fbx_convention_pos;
-      //     } else {
-      //       this.platform.log.warn(`${this.debugName} - position unchanged = ${fbx_convention_pos}`);
-      //     }
-      //   } else {
-      //     this.platform.log.warn(`${this.debugName} - Not shutter position found from http request, try from controller cached data`);
-      //     if (this.shutterDevice.current_position !== null) {
-      //       this.previousPosition = this.currentPosition;
-      //       this.currentPosition = 100 - this.shutterDevice.current_position;
-      //     } else {
-      //       this.platform.log.warn(`${this.debugName} - Not shutter position found in controller cached data !`);
-      //     }
-      //   }
-      // } catch (error) {
-      //   this.platform.log.error(`${error}`);
-      // }
-      // this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.currentPosition);
-      // // this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.updateTrends());
-      // this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.updateTrends());
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.currentPosition);
+    }, this.shuttersRefreshRateMilliSeconds);
+    setImmediate(async () => {
+      const finished = await sleep(1000, '');
+    });
+    setInterval(async () => {
+      await this.updateCurrentTargetPosition();
+    }, this.shuttersRefreshRateMilliSeconds);
+    setImmediate(async () => {
+      const finished = await sleep(1000, '');
+    });
+    setInterval(async () => {
       const trend = this.updateTrends();
-      // this.platform.log.debug(`${this.debugName} - trend ${trend.toString()}`);
       this.service.updateCharacteristic(this.platform.Characteristic.PositionState, trend);
-    }, 1000);
+    }, this.shuttersRefreshRateMilliSeconds);
+  }
+
+  private debug(s: string) {
+    this.platform.log.debug(`FBXShutters ${this.debugName} -> ${s}`);
+  }
+
+  private info(s: string) {
+    this.platform.log.info(`FBXShutters ${this.debugName} -> ${s}`);
+  }
+
+  private warn(s: string) {
+    this.platform.log.warn(`FBXShutters ${this.debugName} -> ${s}`);
+  }
+
+  private error(s: string) {
+    this.platform.log.error(`FBXShutters ${this.debugName} -> ${s}`);
+  }
+
+  private success(s: string) {
+    this.platform.log.success(`FBXShutters ${this.debugName} -> ${s}`);
   }
 
   private async updateCurrentPosition(doPublish: boolean = true) {
+    const funcname = "updateCurrentPosition";
     const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.controllerShutterIndex);
     if (currentPos.value !== null) {
-      // apple convention  : 100 = OPEN / 0 = CLOSED
+      // apple convention  : 100 = OPEN /   0 = CLOSED
+      // Freebox convention: 0   = OPEN / 100 = CLOSED
       // Freebox convention: 100 = CLOSED / 0 = OPEN
-      const apple_convention_pos: number = 100 - currentPos.value;
+      const apple_convention_pos: number = Math.abs(100 - currentPos.value); // abs in case of weird values from FBX ...
+      if (currentPos.value > 100 || currentPos.value < 0) {
+        this.platform.log.error(`${funcname} FBX pos = ${currentPos.value} / apple pos=${apple_convention_pos}`);
+      }
       this.previousPosition = this.currentPosition;
       this.currentPosition = apple_convention_pos;
       if (doPublish) {
@@ -200,9 +185,13 @@ export class FBXShutters {
     }
   }
   private async updateCurrentTargetPosition(doPublish: boolean = true): Promise<boolean> {
+    const funcname = "updateCurrentTargetPosition";
     const currentTargetPos: BlindPosValue = await this.shuttersController.getBlindTargetPosition(this.controllerShutterIndex);
     if (currentTargetPos.value !== null) {
-      const apple_convention_pos: number = 100 - currentTargetPos.value;
+      const apple_convention_pos: number = Math.abs(100 - currentTargetPos.value);
+      if (currentTargetPos.value > 100 || currentTargetPos.value < 0) {
+        this.platform.log.error(`${funcname} FBX pos = ${currentTargetPos.value} / apple pos=${apple_convention_pos}`);
+      }
       this.previousTargetPosition = this.currentTargetPosition;
       this.currentTargetPosition = apple_convention_pos;
       if (doPublish) {
@@ -213,67 +202,26 @@ export class FBXShutters {
     return false;
   }
 
-  // private async updatePosition(){
-  //   try {
-  //     const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.controllerShutterIndex);
-  //     if (currentPos.value !== null) {
-  //       // apple convention  : 100 = OPEN / 0 = CLOSED
-  //       // Freebox convention: 100 = CLOSED / 0 = OPEN
-  //       //switch to FBX convention
-  //       const fbx_convention_pos: number = 100 - currentPos.value;
-  //       if (fbx_convention_pos !== this.previousPosition) {
-  //         this.platform.log.debug(`${this.debugName} - New shutter position = ${fbx_convention_pos} (previous=${previousPosition})`);
-  //         this.previousPosition = this.currentPosition;
-  //         this.currentPosition = fbx_convention_pos;
-  //       } else {
-  //         // this.platform.log.debug(`${this.debugName} - position unchanged = ${fbx_convention_pos}`);
-  //       }
-  //     } else {
-  //       this.platform.log.warn(`${this.debugName} - Not shutter position found from http request, try from controller cached data`);
-  //       if (this.shutterDevice.current_position !== null) {
-  //         this.previousPosition = this.currentPosition;
-  //         this.currentPosition = 100 - this.shutterDevice.current_position;
-  //       } else {
-  //         this.platform.log.warn(`${this.debugName} - Not shutter position found in controller cached data !`);
-  //       }
-  //     }
-  //   } catch (error) {
-  //     this.platform.log.error(`${error}`);
-  //   }
-  //   // this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.currentPosition);
-  //   // this.service.updateCharacteristic(this.platform.Characteristic.PositionState, this.updateTrends());
-  // }
-
   async getCurrentPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.platform.log.warn(`${this.debugName} - Triggered GET CurrentPosition`);
+    this.warn(`Triggered GET CurrentPosition`);
     //callback(null, this.currentPosition);
     return this.currentPosition;
   }
 
   async getPositionState(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.platform.log.warn(`${this.debugName} - Triggered GET PositionState`);
+    this.warn(`Triggered GET PositionState`);
     const trend = this.updateTrends();
-    this.platform.log.warn(`${this.debugName} - PositionState -> ${trend}`);
+    this.warn(`PositionState -> ${trend}`);
     return trend;
   }
 
-  // async getTargetPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-  //   this.platform.log.warn(`${this.debugName} - Triggered GET TargetPosition`);
-  //   // if (this.shutterDevice.target_position !== null) {
-  //   //   this.lastTargetPosition = this.shutterDevice.target_position;
-  //   //   // callback(null, this.lastTargetPosition);
-  //   // }
-  //   // this.platform.log.debug(`${this.debugName} - controller last target pos not defined ... using cached one !`);
-  //   // // callback(null, this.lastTargetPosition);
-  //   return this.currentTargetPosition;
-  // }
   async getTargetPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.platform.log.warn(`${this.debugName} - Triggered GET TargetPosition`);
+    this.warn(`Triggered GET TargetPosition`);
     return this.currentTargetPosition;
   }
 
   async setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-    this.platform.log.warn(`${this.debugName} - Triggered SET TargetPosition: ${value}`);
+    this.warn(`Triggered SET TargetPosition: ${value}`);
     const posVal: number = value as number;
     // apple convention  : 100 = OPEN / 0 = CLOSED
     // Freebox convention: 100 = CLOSED / 0 = OPEN
@@ -285,20 +233,20 @@ export class FBXShutters {
       this.previousTargetPosition = this.currentTargetPosition;
       this.currentTargetPosition = posVal;
     } else {
-      this.platform.log.debug(`${this.debugName} - Triggered SET TargetPosition: ${value} FAILED. KEPT LAST VALUE`);
+      this.debug(`Triggered SET TargetPosition: ${value} FAILED. KEPT LAST VALUE`);
       callback(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
     }
     // }
   }
 
   // async setHoldPosition(value: CharacteristicValue/*callback: CharacteristicSetCallback*/) {
-  //   this.platform.log.warn(`${this.debugName} - Triggered SET HoldPosition ${value}`);
+  //   this.warn(`Triggered SET HoldPosition ${value}`);
   //   const status: boolean = await this.shuttersController.stopBlind(this.controllerShutterIndex);
   //   if (status) {
-  //     this.platform.log.debug(`${this.debugName} - Triggered SET HoldPosition success`);
+  //     this.debug(`Triggered SET HoldPosition success`);
   //     // callback(null);
   //   } else {
-  //     this.platform.log.debug(`${this.debugName} - Triggered SET HoldPosition FAILED ...`);
+  //     this.debug(`Triggered SET HoldPosition FAILED ...`);
   //     // callback(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
   //   }
   // }
@@ -306,13 +254,13 @@ export class FBXShutters {
   private updateTrends(): CharacteristicValue {
     // apple convention  : 100 = OPEN / 0 = CLOSED
     if (this.currentPosition > this.previousPosition) {
-      // this.platform.log.debug(`${this.debugName} - PositionState -> INCREASING`);
+      // this.debug(`PositionState -> INCREASING`);
       return this.platform.Characteristic.PositionState.INCREASING;
     } else if (this.currentPosition < this.previousPosition) {
-      // this.platform.log.debug(`${this.debugName} - PositionState -> DECREASING`);
+      // this.debug(`PositionState -> DECREASING`);
       return this.platform.Characteristic.PositionState.DECREASING;
     } else {
-      // this.platform.log.debug(`${this.debugName} - PositionState -> STOPPED`);
+      // this.debug(`PositionState -> STOPPED`);
       // this.currentTargetPosition = this.currentPosition;
 
       // necessary ?

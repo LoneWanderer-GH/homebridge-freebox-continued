@@ -1,32 +1,32 @@
 import { Logging } from 'homebridge';
 // import { setTimeout as sleep } from 'timers/promises';
-import { FBXEndPointResult, FBXHomeNode, FBXHomeNodeCategory, FBXNodesResult } from '../FreeboxHomeTypes/FBXHomeTypes.js';
+import { FBXEndPointResult, FBXHomeNode, FBXHomeNodeCategory } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
 
 export enum AlarmKind {
-    NO_ALARM = 0,
-    MAIN_ALARM = 1,
-    NIGHT_ALARM = 2,
+  NO_ALARM = 0,
+  MAIN_ALARM = 1,
+  NIGHT_ALARM = 2,
 }
 
 export enum AlarmState {
-    //The alarm is off
-    idle = 'idle',
-    //The main alarm is beeing activated, it’s a countdown when only the sensors not in the timed zone can trigger the alert
-    MAIN_alarm_arming = 'alarm1_arming',
-    //The night alarm is beeing activated, it’s a countdown when only the sensors not in the timed zone can trigger the alert
-    NIGHT_alarm_arming = 'alarm2_arming',
-    //The main alarm is on
-    MAIN_alarm_armed = 'alarm1_armed',
-    //The night alarm is on
-    NIGHT_alarm_armed = 'alarm2_armed',
-    //The main alarm has been trigged by a sensor in the timed zone and the siren will ring after a countdown
-    MAIN_alarm_alert_timer = 'alarm1_alert_timer',
-    //The night alarm has been trigged by a sensor in the timed zone and the siren will ring after a countdown
-    NIGHT_alarm_alert_timer = 'alarm2_alert_timer',
-    //The siren is ringing
-    alert = 'alert',
+  //The alarm is off
+  idle = 'idle',
+  //The main alarm is beeing activated, it’s a countdown when only the sensors not in the timed zone can trigger the alert
+  MAIN_alarm_arming = 'alarm1_arming',
+  //The night alarm is beeing activated, it’s a countdown when only the sensors not in the timed zone can trigger the alert
+  NIGHT_alarm_arming = 'alarm2_arming',
+  //The main alarm is on
+  MAIN_alarm_armed = 'alarm1_armed',
+  //The night alarm is on
+  NIGHT_alarm_armed = 'alarm2_armed',
+  //The main alarm has been trigged by a sensor in the timed zone and the siren will ring after a countdown
+  MAIN_alarm_alert_timer = 'alarm1_alert_timer',
+  //The night alarm has been trigged by a sensor in the timed zone and the siren will ring after a countdown
+  NIGHT_alarm_alert_timer = 'alarm2_alert_timer',
+  //The siren is ringing
+  alert = 'alert',
 }
 
 export class AlarmController {
@@ -36,10 +36,11 @@ export class AlarmController {
   private freeboxRequest!: FreeboxRequest;
 
   constructor(
-        public readonly log: Logging,
-        freeboxRequest: FreeboxRequest,
-        private readonly freeboxAddress:string,
-        private readonly freeboxApiVersion:string,
+    public readonly log: Logging,
+    freeboxRequest: FreeboxRequest,
+    // private readonly freeboxAddress: string,
+    // private readonly freeboxApiVersion: string,
+    private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
     this.debug('Create Alarm controller');
@@ -74,40 +75,38 @@ export class AlarmController {
   //     }
   //   }
 
-  private async getAlarm(): Promise<FBXHomeNode | null> {
+  getAlarm(nodes: Array<FBXHomeNode>): FBXHomeNode | null {
     this.debug('getAlarm');
-    const url = `http://${this.freeboxAddress}/http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/nodes`;
-    const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.AUTO_RETRY);
-    const data: FBXNodesResult = result.data as FBXNodesResult;
-    if (result.status_code === 200 && data.success) {
-      for (const node of data.result) {
-        if (node.category === FBXHomeNodeCategory.alarm) { //=== 'alarm') {
-          this.storedAlarmNode = node;
-          this.success(`Found alarm node ! ${node.name} ${node.label}`);
-          return node;
-        }
+    //const url = `${this.apiUrl}/${this.freeboxApiVersion}/home/nodes`;
+    // const url = `${this.apiUrl}/home/nodes`;
+    // const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.AUTO_RETRY);
+    // const data: FBXNodesResult = result.data as FBXNodesResult;
+    // if (result.status_code === 200 && data.success) {
+    for (const node of nodes) {
+      if (node.category === FBXHomeNodeCategory.alarm) { //=== 'alarm') {
+        this.storedAlarmNode = node;
+        this.success(`Found alarm node ! ${node.name} ${node.label}`);
+        return node;
       }
-    } else {
-      this.warn(`Got a ${result.status_code}, unable to request: ${url}`);
-      this.error(JSON.stringify(data));
-      return null;
     }
+    // } else {
+    //   this.warn(`Got a ${result.status_code}, unable to request: ${url}`);
+    //   this.error(JSON.stringify(data));
+    //   return null;
+    // }
     return null;
   }
 
-  /*
-         *
-         */
   async refreshAlarmTarget() {
     if (this.storedAlarmNode) {
       const ep_id = this.getStateEndpoint();
-      const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
-      const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.NO_RETRY);//, (statusCode, body) => {
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.NO_RETRY);
       const data: FBXEndPointResult = result.data as FBXEndPointResult;
       if (result && data.success) {
         const value = data.result.value;
-        if (data.result.value_type !== 'void') {
-          this.warn(`Value type is ${data.result.value_type}, expected void or string`);
+        if (data.result.value_type !== 'void' && data.result.value_type !== 'string') {
+          this.warn(`Value type is "${data.result.value_type}", expected void or string. Reply ${JSON.stringify(data.result)}`);
         }
         if (value.includes('alarm1')) {
           this.storedAlarmTarget = AlarmKind.MAIN_ALARM;
@@ -127,6 +126,7 @@ export class AlarmController {
       //     this.refreshAlarmTarget();
       this.warn('No alarm node found yet ... Did discovery happened yet ?!');
     }
+    return this.storedAlarmTarget;
   }
 
   private getMainEndpoint(): number | undefined {
@@ -191,14 +191,15 @@ export class AlarmController {
     }
   }
 
-  private async getAlarmState(): Promise<AlarmState | null> {
+  async getAlarmState(): Promise<AlarmState | null> {
     if (this.storedAlarmNode) {
       const ep_id = this.getStateEndpoint();
-      const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
-      const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, {
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      const _payload = {
         id: this.storedAlarmNode.id,
         value: null,
-      }, RetryPolicy.NO_RETRY);
+      };
+      const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.NO_RETRY);
       const data: FBXEndPointResult = result.data as FBXEndPointResult;
       if (result && data.success) {
         const value = AlarmState[data.result.value as keyof typeof AlarmState];
@@ -211,7 +212,7 @@ export class AlarmController {
             this.storedAlarmTarget = AlarmKind.MAIN_ALARM;
             this.isArming = true;
             break;
-            // } else if (value === 'alarm2_armed' || value === 'alarm2_arming') {
+          // } else if (value === 'alarm2_armed' || value === 'alarm2_arming') {
           case AlarmState.NIGHT_alarm_armed:
             this.storedAlarmTarget = AlarmKind.NIGHT_ALARM;
             break;
@@ -219,8 +220,12 @@ export class AlarmController {
             this.storedAlarmTarget = AlarmKind.NIGHT_ALARM;
             this.isArming = true;
             break;
+          case AlarmState.idle:
+            this.storedAlarmTarget = AlarmKind.NO_ALARM;
+            this.isArming = false;
+            break;
           default:
-            this.error('WTF ?!');
+            this.error(`WTF ?! Received Alarm state ${JSON.stringify(data.result)} => ${value}`);
         }
         // this.isArming = value.includes('arming');
         //   callback(value);
@@ -246,10 +251,10 @@ export class AlarmController {
     return this.storedAlarmTarget;
   }
 
-  private async setAlarmDisabled(): Promise<boolean> {
+  async setAlarmDisabled(): Promise<boolean> {
     if (this.storedAlarmNode) {
       const ep_id = this.getOffEndpoint();
-      const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
       this.storedAlarmTarget = AlarmKind.NO_ALARM;
       const result: FBXRequestResult = await this.freeboxRequest.request(
         'PUT',
@@ -268,7 +273,7 @@ export class AlarmController {
     }
   }
 
-  async setAlarm(kind: AlarmKind): Promise<boolean> {
+  private async setAlarm(kind: AlarmKind): Promise<boolean> {
     switch (kind) {
       case AlarmKind.MAIN_ALARM:
       case AlarmKind.NIGHT_ALARM:
@@ -283,7 +288,7 @@ export class AlarmController {
     const activable: boolean = await this.checkAlarmActivable(kind);
     if (activable && this.storedAlarmNode) {
       const ep_id = this.getAlarmKindEndpoint(kind);
-      const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+      const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
       this.storedAlarmTarget = kind;
       const result: FBXRequestResult = await this.freeboxRequest.request(
         'PUT',
@@ -307,7 +312,7 @@ export class AlarmController {
     // const activable: boolean = await this.checkAlarmActivable(AlarmKind.MAIN_ALARM);
     // if (activable && this.storedAlarmNode) {
     //   const ep_id = this.getMainEndpoint();
-    //   const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+    //   const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
     //   this.storedAlarmTarget = AlarmKind.MAIN_ALARM;
     //   const result: FBXRequestResult = await this.freeboxRequest.request('PUT', url,
     //     { id: this.storedAlarmNode.id, value: null }); //, (statusCode, body) => {
@@ -328,7 +333,7 @@ export class AlarmController {
     // const activable: boolean = await this.checkAlarmActivable(AlarmKind.NIGHT_ALARM);
     // if (activable && this.storedAlarmNode) {
     //   const ep_id = this.getSecondaryEndpoint();
-    //   const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
+    //   const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${ep_id}`;
     //   this.storedAlarmTarget = AlarmKind.NIGHT_ALARM;
     //   const result: FBXRequestResult = await this.freeboxRequest.request('PUT', url, { id: this.storedAlarmNode.id, value: null });
     //   const data: FBXEndPointResult = result.data as FBXEndPointResult;

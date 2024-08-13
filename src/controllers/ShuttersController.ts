@@ -2,11 +2,11 @@ import { Logging } from 'homebridge';
 // import { setTimeout as sleep } from 'timers/promises';
 import {
   FBXEndPointResult,
+  FBXHomeNode,
   FBXHomeNodeCategory,
   FBXHomeNodeEndpoint,
   FBXHomeNodeEndpointValue,
   FBXNodeAccessMode,
-  FBXNodesResult,
 } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
@@ -30,8 +30,9 @@ export class ShuttersController {
   constructor(
     public readonly log: Logging,
     freeboxRequest: FreeboxRequest,
-    private readonly freeboxAddress: string,
-    private readonly freeboxApiVersion: string,
+    // private readonly freeboxAddress: string,
+    // private readonly freeboxApiVersion: string,
+    private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
     this.debug('Create Shutters controller');
@@ -57,55 +58,42 @@ export class ShuttersController {
     this.log.success(`ShuttersController -> ${s}`);
   }
 
-
-  //   init(freeboxRequest) {
-  //     this.freeboxRequest = freeboxRequest;
-  //     this.getBlinds((blinds) => {
-  //       this.storedBlinds = blinds;
-  //       if (blinds != null) {
-  //         this.debug('found ' + this.storedBlinds.length + ' blinds');
-  //       } else {
-  //         this.debug('no blinds found ?!');
-  //       }
-  //     });
-  //   }
-
-  isValidShutterPosition(pos: number): boolean {
+  private isValidShutterPosition(pos: number): boolean {
     return pos >= 0 && pos <= 100;
   }
 
-  async getBlinds(): Promise<(Array<FBXBlind>)> {
+  getBlinds(nodes: Array<FBXHomeNode>): Array<FBXBlind> {
     const rval: Array<FBXBlind> = [];
-    const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/nodes`;
-    const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.AUTO_RETRY);
-    if (result.status_code !== 200) {
-      this.debug(`received error ${result.status_code} to ${url}`);
-      return rval;
-    }
-    const data: FBXNodesResult = result.data as FBXNodesResult;
-    if (data !== null) {
-      if (data.success) {
-        for (const node of data.result) {
-          if (node.category === FBXHomeNodeCategory.shutter) { //== 'shutter') {
-            const o: FBXBlind = {
-              nodeid: node.id,
-              displayName: node.label,
-              show_endpoints: node.show_endpoints,
-              endpoints: node.type.endpoints,
-              current_position: null,
-              current_target_position: null,
-            };
-            this.debug('found store/shutter=' + o.nodeid + '->' + o.displayName);
-            // console.log(JSON.stringify(node))
-            rval.push(o);
-          }
-        }
-      } else {
-        this.warn(`Request result said status failed. ${data} for ${url}`);
+    // const url = `${this.apiUrl}/home/nodes`;
+    // const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.AUTO_RETRY);
+    // if (result.status_code !== 200) {
+    //   this.debug(`received error ${result.status_code} to ${url}`);
+    //   return rval;
+    // }
+    // const data: FBXNodesResult = result.data as FBXNodesResult;
+    // if (data !== null) {
+    //   if (data.success) {
+    for (const node of nodes) {
+      if (node.category === FBXHomeNodeCategory.shutter) { //== 'shutter') {
+        const o: FBXBlind = {
+          nodeid: node.id,
+          displayName: node.label,
+          show_endpoints: node.show_endpoints,
+          endpoints: node.type.endpoints,
+          current_position: null,
+          current_target_position: null,
+        };
+        this.debug('found store/shutter=' + o.nodeid + '->' + o.displayName);
+        // console.log(JSON.stringify(node))
+        rval.push(o);
       }
-    } else {
-      this.warn(`Request result gave no data for ${url}`);
     }
+    //   } else {
+    //     this.warn(`Request result said status failed. ${data} for ${url}`);
+    //   }
+    // } else {
+    //   this.warn(`Request result gave no data for ${url}`);
+    // }
     this.storedBlinds = rval;
     return rval;
   }
@@ -201,7 +189,7 @@ export class ShuttersController {
                 No valid endpointid found (expected=${expected_end_point_name})`);
     }
     const blind_debug_str = `blind ${blind.displayName} (nodeid=${node_id}), endpointid=${ep_id})`;
-    const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/home/endpoints/${node_id}/${ep_id}`;
+    const url = `${this.apiUrl}/home/endpoints/${node_id}/${ep_id}`;
     // this.debug(`${blind.displayName} => prepare call ${url}`);
     let payload: unknown = null;
     if (http_method === 'PUT' && value !== null && typeof (value) === 'number') {
@@ -243,25 +231,6 @@ export class ShuttersController {
     } else {
       return data.result;
     }
-    // this.success(`${expected_end_point_name} ${access_mode} -> ${blind.displayName} nodeid=${node_id} endpointid=${ep_id} Success !`);
-    // if (http_method === 'GET') {
-    //   blind.current_position = parseInt(data.result.value);
-    //   return { status: true, value: blind.current_position };
-    // }
-    // if (http_method === 'PUT' && value !== null && typeof (value) === 'number') {
-    //   blind.target_position = value; // update cached info !
-    // }
-    // } catch (error) {
-    //   if (error instanceof DataNotUpdatedError) {
-    //     if (blind.current_position === null) {
-    //       blind.current_position = 0;
-    //     }
-    //     return { status: true, value: blind.current_position };
-    //   } else {
-    //     throw error;
-    //   }
-    // }
-    // return { status: true, value: -1 };
   }
 
 
@@ -279,7 +248,7 @@ export class ShuttersController {
       if (rval.value_type === 'int') {
         const v: number = parseInt(rval.value);
         blind.current_target_position = v;
-        this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
+        // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
       } else {
         throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
       }

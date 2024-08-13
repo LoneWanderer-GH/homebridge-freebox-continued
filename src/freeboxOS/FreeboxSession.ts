@@ -83,8 +83,9 @@ export class FreeboxSession {
   constructor(
     public readonly log: Logging,
     public readonly network: Network,
-    private readonly freeboxAddress:string,
-    private readonly freeboxApiVersion:string,
+    // private readonly freeboxAddress:string,
+    // private readonly freeboxApiVersion:string,
+    private readonly apiUrl:string,
   ) {
 
   }
@@ -147,7 +148,7 @@ export class FreeboxSession {
 
   // Get a token and a trackId.
   async auth(): Promise<[string | null, number | null]> {
-    const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/login/authorize/`;
+    const url = `${this.apiUrl}/login/authorize/`;
     const data = {
       app_id: 'hb.fbx-home',
       app_name: 'Homebridge-Freebox',
@@ -209,7 +210,7 @@ export class FreeboxSession {
 
   // Check for the access to be granted (user has taped the check mark on the box).
   async grantAccess(trackId: number): Promise<FBXAuthStatus> { //, callback: Function) {
-    const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/login/authorize/${trackId}`;
+    const url = `${this.apiUrl}/login/authorize/${trackId}`;
     const fbxREquestResult = await this.network.request('GET', url, {}); //, (_statusCode: number, body: FBXLoginAuthTrackIdReply) => {
     const body = fbxREquestResult.data as FBXLoginAuthTrackIdReply;
     if (body === null) {
@@ -254,7 +255,7 @@ export class FreeboxSession {
       const password = crypto.createHmac('sha1', token)
         .update(challenge)
         .digest('hex');
-      const url = `http://${this.freeboxAddress}/api/${this.freeboxApiVersion}/login/session`;
+      const url = `${this.apiUrl}/login/session`;
       const header = {
         'X-Fbx-App-Auth': token,
       };

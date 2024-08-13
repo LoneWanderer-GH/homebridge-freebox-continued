@@ -25,6 +25,13 @@
         "type": "string",
         "required": true,
         "default": "mafreebox.freebox.fr"
+      },
+      "shuttersRefreshRateMilliSeconds" :{
+        "title": "Window shutters refresh rate (in milliseconds)",
+        "description": "how often to ask Freebox for shutters info",
+        "type": "string",
+        "required": true,
+        "default": 4000
       }
     }
   }

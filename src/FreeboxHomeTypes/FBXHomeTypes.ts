@@ -24,7 +24,7 @@ export interface FBXHomeNodeEndpointValue {
     refresh?: number;
 
     // The type of value this enpoint expose
-    value_type: 'bool' | 'int' | 'float' | 'void';
+    value_type: 'bool' | 'int' | 'float' | 'void' | 'string';
 }
 export type FBXNodeAccessMode = 'r' | 'w' | 'rw';
 

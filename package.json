@@ -1,6 +1,6 @@
 {
   "private": true,
-  "displayName": "Freebox - Api V8",
+  "displayName": "Freebox Home Api",
   "name": "homebridge-freebox-continued",
   "version": "0.0.1",
   "description": "Porting of the legacy Freebox Homebridge https://github.com/fbx/homebridge-freebox-home. Supports window covering/slats/shutters.",
