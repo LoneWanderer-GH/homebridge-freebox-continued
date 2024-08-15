@@ -113,7 +113,7 @@ export class FBXShutters {
       await this.updateCurrentPosition(false);
       const gotCurrentTargetPos = await this.updateCurrentTargetPosition(false);
       if (!gotCurrentTargetPos) {
-        this.warn("Could not find a initial target position");
+        this.warn('Could not find a initial target position');
       }
     });
 
@@ -164,7 +164,7 @@ export class FBXShutters {
   }
 
   private async updateCurrentPosition(doPublish: boolean = true) {
-    const funcname = "updateCurrentPosition";
+    const funcname = 'updateCurrentPosition';
     const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.shutterDevice);
     if (currentPos.value !== null) {
       // apple convention  : 100 = OPEN /   0 = CLOSED
@@ -183,8 +183,9 @@ export class FBXShutters {
       }
     }
   }
+
   private async updateCurrentTargetPosition(doPublish: boolean = true): Promise<boolean> {
-    const funcname = "updateCurrentTargetPosition";
+    const funcname = 'updateCurrentTargetPosition';
     const currentTargetPos: BlindPosValue = await this.shuttersController.getBlindTargetPosition(this.shutterDevice);
     if (currentTargetPos.value !== null) {
       const apple_convention_pos: number = Math.abs(100 - currentTargetPos.value);
@@ -202,20 +203,20 @@ export class FBXShutters {
   }
 
   async getCurrentPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn(`Triggered GET CurrentPosition`);
+    this.warn('Triggered GET CurrentPosition');
     //callback(null, this.currentPosition);
     return this.currentPosition;
   }
 
   async getPositionState(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn(`Triggered GET PositionState`);
+    this.warn('Triggered GET PositionState');
     const trend = this.updateTrends();
     this.warn(`PositionState -> ${trend}`);
     return trend;
   }
 
   async getTargetPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn(`Triggered GET TargetPosition`);
+    this.warn('Triggered GET TargetPosition');
     return this.currentTargetPosition;
   }
 
