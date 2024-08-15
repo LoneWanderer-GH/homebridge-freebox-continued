@@ -1,6 +1,8 @@
 import { Logging } from 'homebridge';
-import fetch, { Response as NodeFetchResponse } from 'node-fetch';
 
+import fetch, { RequestInit as NodeFetchRequestInit, Response as NodeFetchResponse } from 'node-fetch';
+import * as fs from 'fs';
+import https from 'https';
 
 export interface FBXRequestResult {
   status_code: number | null;
@@ -8,9 +10,19 @@ export interface FBXRequestResult {
 }
 
 export class Network {
+  private httpsAgent: https.Agent;
+
   constructor(
     public readonly log: Logging,
   ) {
+    const ca = fs.readFileSync('FBXCerts.crt');
+    this.httpsAgent = new https.Agent({
+      ca: ca,
+      keepAlive: true,
+    });
+    // this.httpsAgent.on('keylog', (line, _tlsSocket) => {
+    //   this.debug(`SSL KEYS event: ${line}`);
+    // });
   }
 
   private debug(s: string) {
@@ -41,44 +53,28 @@ export class Network {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     body: any = null,
   ): Promise<FBXRequestResult> { //, callback:Function) {
-    const debug_str_prefix = `${method} ${url}`;
+    // const debug_str_prefix = `${method} ${url}`;
     headers['Content-Type'] = 'application/json; charset=utf-8';
-    // try {
-    let request = null;
-    if (body !== null) {// TODO: better syntax for this ?!
-      request = {
-        method: method,
-        headers: headers,
-        body: JSON.stringify(body),
-      };
-      this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
+    const request: NodeFetchRequestInit = {
+      method: method,
+      headers: headers,
+      agent: this.httpsAgent,
+    };
+    if (body !== null) {
+      request.body = JSON.stringify(body);
+      // this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
     } else {
-      request = {
-        method: method,
-        headers: headers,
-      };
-      this.debug(`${debug_str_prefix} -> request: (no body)`);
+      // this.debug(`${debug_str_prefix}`);
     }
     const response: NodeFetchResponse = await fetch(url, request);
-    // const clone = response.clone();
-    // this.debug(`   |-> response size  : ${JSON.stringify(response)}`);
-    // try{
     if (!response.ok) {
       await this.handleHTTPErrorCodes(response, url, method, body);
-      return { status_code: response.status, data: {error_code: 'retry_later'}};
+      return { status_code: response.status, data: { error_code: 'retry_later' } };
     } else {
       const jsonData = await response.json();
-      this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
+      // this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
       return { status_code: response.status, data: jsonData };
     }
-    // } catch (error) {
-    //   this.error(JSON.stringify(error));
-    //   return { status_code: null, data: null };
-    // }
-    // } catch(error) {
-    //   this.debug(`   |-> response body  : ${clone.status}\n\n${clone.text()}`);
-    //   throw error;
-    // }
   }
 
   private async handleHTTPErrorCodes(response: NodeFetchResponse, url: string, method: string, body: unknown) {
@@ -99,31 +95,7 @@ export class Network {
     } else {
       this.handleOtherHTTPErrors(response, errortext);
     }
-
-    // const replyContentType: string[] = response.headers.raw()['content-type'];
-
-    // if (replyContentType.length === 1) {
-    //   // so far so good with Freebox API
-    //   if (!replyContentType[0].includes('application/json'.toLowerCase())) {
-    //     await this.handleReplyIsNotJSON(response);
-    //   } else {
-    //     // that was a JSON ?!
-    //     const jsonData = await response.json();
-    //     throw new Error(`${response.status}. ${JSON.stringify(jsonData)}`);
-    //   }
-    // } else {
-    //   throw new Error(`${response.status}.Weird header content-type ... ${replyContentType}`);
-    // }
   }
-  // private async handleReplyIsNotJSON(response: NodeFetchResponse) {
-
-  //   this.error(errortext);
-  //   if (response.status === 503) {
-  //     this.handleHTTPError503(errortext, response);
-  //   } else {
-  //     this.handleOtherHTTPErrors(response, errortext);
-  //   }
-  // }
 
   private handleOtherHTTPErrors(response: NodeFetchResponse, errortext: string) {
     this.error(JSON.stringify(response.headers.raw()['content-type']));

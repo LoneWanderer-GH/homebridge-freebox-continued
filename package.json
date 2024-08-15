@@ -34,6 +34,7 @@
     "freebox delta"
   ],
   "dependencies": {
+    "https": "^1.0.0",
     "node-fetch": "^3.0.0"
   },
   "devDependencies": {

@@ -1,23 +1,41 @@
 import { Logging } from 'homebridge';
-import { setTimeout as sleep } from 'timers/promises';
+// import { setTimeout as sleep } from 'timers/promises';
 import {
   FBXEndPointResult,
   FBXHomeNode,
   FBXHomeNodeCategory,
   FBXHomeNodeEndpoint,
+  FBXHomeNodeEndPointType,
   FBXHomeNodeEndpointValue,
-  FBXNodeAccessMode,
+  // FBXNodeAccessMode,
 } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
 
+
+export interface FBXBlindEndPointCommand {
+  endpoint: number;
+  http_method: 'GET' | 'PUT';
+}
+
 export interface FBXBlind {
   nodeid: number;
   displayName: string;
-  show_endpoints: Array<FBXHomeNodeEndpoint>;
-  endpoints: Array<FBXHomeNodeEndpoint>;
+  // show_endpoints: Array<FBXHomeNodeEndpoint>;
+  // endpoints: Array<FBXHomeNodeEndpoint>;
   current_position: number | null;
   current_target_position: number | null;
+  // targetCurrentPosEndpoint: number,
+  // currentPosEndPoint: number,
+  // // setTargetPosEndpoint: number,
+  // setPosEndPoint: number,
+  // toggleEndpoint: number,
+  // stopEndPoint: number,
+  getTargetPos: FBXBlindEndPointCommand;
+  setTargetPos: FBXBlindEndPointCommand;
+  getPos: FBXBlindEndPointCommand;
+  toggle: FBXBlindEndPointCommand;
+  stop: FBXBlindEndPointCommand;
 }
 export interface BlindPosValue {
   value: number | null;
@@ -26,7 +44,7 @@ export interface BlindPosValue {
 export class ShuttersController {
   private freeboxRequest!: FreeboxRequest;
 
-  private storedBlinds: Array<FBXBlind> = [];
+  // private storedBlinds: Array<FBXBlind> = [];
   constructor(
     public readonly log: Logging,
     freeboxRequest: FreeboxRequest,
@@ -78,10 +96,30 @@ export class ShuttersController {
         const o: FBXBlind = {
           nodeid: node.id,
           displayName: node.label,
-          show_endpoints: node.show_endpoints,
-          endpoints: node.type.endpoints,
+          // show_endpoints: node.show_endpoints,
+          // endpoints: node.type.endpoints,
           current_position: null,
           current_target_position: null,
+          getTargetPos: {
+            endpoint: this.findEndPointId(node.type.endpoints, 'position_set', FBXHomeNodeEndPointType.slot),
+            http_method: 'GET',
+          },
+          setTargetPos: {
+            endpoint: this.findEndPointId(node.type.endpoints, 'position_set', FBXHomeNodeEndPointType.slot),
+            http_method: 'PUT',
+          },
+          getPos: {
+            endpoint: this.findEndPointId(node.type.endpoints, 'position_set', FBXHomeNodeEndPointType.signal),
+            http_method: 'GET',
+          },
+          toggle: {
+            endpoint: this.findEndPointId(node.type.endpoints, 'toggle', FBXHomeNodeEndPointType.slot),
+            http_method: 'PUT',
+          },
+          stop: {
+            endpoint: this.findEndPointId(node.type.endpoints, 'stop', FBXHomeNodeEndPointType.slot),
+            http_method: 'PUT',
+          },
         };
         this.debug('found store/shutter=' + o.nodeid + '->' + o.displayName);
         // console.log(JSON.stringify(node))
@@ -94,105 +132,126 @@ export class ShuttersController {
     // } else {
     //   this.warn(`Request result gave no data for ${url}`);
     // }
-    this.storedBlinds = rval;
+    // this.storedBlinds = rval;
     return rval;
   }
 
-  private getEndPointIdWithNameAndAccess(
-    blind: FBXBlind,
+  private findEndPointId(
+    nodeEndpoints: Array<FBXHomeNodeEndpoint>,
     name: string,
-    rw_status: FBXNodeAccessMode | null,
-  ): number | null {
-    if (blind === null) {
-      return null;
-    }
-    for (const endpoint of blind.show_endpoints) {
+    type: FBXHomeNodeEndPointType,
+  ): number {
+    for (const endpoint of nodeEndpoints) {
       if (endpoint.name !== name) {
         continue;
       }
-      if (endpoint.access !== null && endpoint.access! === rw_status) {
+      if (endpoint.ep_type !== null && endpoint.ep_type === type) {
         // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
         //     ==> endpoint id=${endpoint.id}`);
         return endpoint.id;
-      } else {
-        // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
-        // this.debug('getEndPointIdWithName -> trying ui data');
-        if (endpoint.ui !== null && endpoint.ui!.access === rw_status) {
-          // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
-          //   ==> endpoint id=${endpoint.id}`);
-          return endpoint.id;
-        }
       }
     }
-    return null;
+    throw new Error('Endpoint node not found: name=' + name + ' type=' + type);
   }
 
-  private getEndPointIdWithName(
-    blind: FBXBlind,
-    name: string,
-  ): number | null {
-    if (blind === null) {
-      return null;
-    }
-    for (const endpoint of blind.show_endpoints) {
-      if (endpoint.name !== name) {
-        continue;
-      }
-      if (endpoint.access !== null) {
-        // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
-        //     ==> endpoint id=${endpoint.id}`);
-        return endpoint.id;
-      } else {
-        // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
-        // this.debug('getEndPointIdWithName -> trying ui data');
-        if (endpoint.ui !== null) {
-          // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
-          //   ==> endpoint id=${endpoint.id}`);
-          return endpoint.id;
-        }
-      }
-    }
-    return null;
-  }
+  // private getEndPointIdWithNameAndAccess(
+  //   blind: FBXBlind,
+  //   name: string,
+  //   rw_status: FBXNodeAccessMode | null,
+  // ): number | null {
+  //   if (blind === null) {
+  //     return null;
+  //   }
+  //   for (const endpoint of blind.show_endpoints) {
+  //     if (endpoint.name !== name) {
+  //       continue;
+  //     }
+  //     if (endpoint.access !== null && endpoint.access! === rw_status) {
+  //       // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //       //     ==> endpoint id=${endpoint.id}`);
+  //       return endpoint.id;
+  //     } else {
+  //       // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
+  //       // this.debug('getEndPointIdWithName -> trying ui data');
+  //       if (endpoint.ui !== null && endpoint.ui!.access === rw_status) {
+  //         // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //         //   ==> endpoint id=${endpoint.id}`);
+  //         return endpoint.id;
+  //       }
+  //     }
+  //   }
+  //   return null;
+  // }
 
-  private getBlindAtIndex(blind_index: number): FBXBlind {
-    if (blind_index < 0 && blind_index >= this.storedBlinds.length) {
-      throw new Error(`Failed to get blind at index ${blind_index} : index out of bounds.
-            There are ${this.storedBlinds.length} blinds knowns so far`);
-    }
-    return this.storedBlinds[blind_index];
-  }
+  // private getEndPointIdWithName(
+  //   blind: FBXBlind,
+  //   name: string,
+  // ): number | null {
+  //   if (blind === null) {
+  //     return null;
+  //   }
+  //   for (const endpoint of blind.show_endpoints) {
+  //     if (endpoint.name !== name) {
+  //       continue;
+  //     }
+  //     if (endpoint.access !== null) {
+  //       // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //       //     ==> endpoint id=${endpoint.id}`);
+  //       return endpoint.id;
+  //     } else {
+  //       // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
+  //       // this.debug('getEndPointIdWithName -> trying ui data');
+  //       if (endpoint.ui !== null) {
+  //         // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //         //   ==> endpoint id=${endpoint.id}`);
+  //         return endpoint.id;
+  //       }
+  //     }
+  //   }
+  //   return null;
+  // }
+
+  // private getBlindAtIndex(blind_index: number): FBXBlind {
+  //   if (blind_index < 0 && blind_index >= this.storedBlinds.length) {
+  //     throw new Error(`Failed to get blind at index ${blind_index} : index out of bounds.
+  //           There are ${this.storedBlinds.length} blinds knowns so far`);
+  //   }
+  //   return this.storedBlinds[blind_index];
+  // }
 
   private async executeCommand(
-    blind_index: number,
+    // blind_index: number,
+    blind: FBXBlind,
+    cmd: FBXBlindEndPointCommand,
+    // ep_id : number,
     // cmdDisplayName:string,
-    expected_end_point_name: string,
-    access_mode: FBXNodeAccessMode | null,
-    http_method: 'GET' | 'PUT',
+    // expected_end_point_name: string,
+    // access_mode: FBXNodeAccessMode | null,
+    // http_method: 'GET' | 'PUT',
     value: boolean | number | null,
     // previousValue: boolean | number | null,
     // ): Promise<{ status: boolean; value: number }> {
   ): Promise<FBXHomeNodeEndpointValue | null> {
     // this.debug(`${expected_end_point_name} ${access_mode} -> blind index=${blind_index}`);
-    const blind = this.getBlindAtIndex(blind_index);
+    // const blind = this.getBlindAtIndex(blind_index);
     // this.debug(`${expected_end_point_name} ${access_mode} -> blind=${blind.displayName} nodeid=${blind.nodeid}`);
     const node_id = blind.nodeid;
-    let ep_id: number | null = null;
-    if (access_mode === null) {
-      ep_id = this.getEndPointIdWithName(blind, expected_end_point_name);
-    } else {
-      ep_id = this.getEndPointIdWithNameAndAccess(blind, expected_end_point_name, access_mode);
-    }
-    if (ep_id === null) {
-      this.warn(`${expected_end_point_name} -> expected endpoint with name=${expected_end_point_name} ${access_mode} not found...`);
-      throw new Error(`Failed to send ${expected_end_point_name} to blind ${blind.displayName} (nodeid=${node_id}).
-                No valid endpointid found (expected=${expected_end_point_name})`);
-    }
-    const blind_debug_str = `blind ${blind.displayName} (nodeid=${node_id}), endpointid=${ep_id})`;
-    const url = `${this.apiUrl}/home/endpoints/${node_id}/${ep_id}`;
+    // let ep_id: number | null = null;
+    // if (access_mode === null) {
+    //   ep_id = this.getEndPointIdWithName(blind, expected_end_point_name);
+    // } else {
+    //   ep_id = this.getEndPointIdWithNameAndAccess(blind, expected_end_point_name, access_mode);
+    // }
+    // if (ep_id === null) {
+    //   this.warn(`${expected_end_point_name} -> expected endpoint with name=${expected_end_point_name} ${access_mode} not found...`);
+    //   throw new Error(`Failed to send ${expected_end_point_name} to blind ${blind.displayName} (nodeid=${node_id}).
+    //             No valid endpointid found (expected=${expected_end_point_name})`);
+    // }
+    const blind_debug_str = `blind ${blind.displayName} (nodeid=${node_id}), endpointid=${cmd.endpoint})`;
+    const url = `${this.apiUrl}/home/endpoints/${node_id}/${cmd.endpoint}`;
     // this.debug(`${blind.displayName} => prepare call ${url}`);
     let payload: unknown = null;
-    if (http_method === 'PUT' && value !== null && typeof (value) === 'number') {
+    if (cmd.http_method === 'PUT' && value !== null && typeof (value) === 'number') {
       const posValid = this.isValidShutterPosition(value! as number);
       if (!posValid) {
         throw new RangeError(`Won't send cmd to ${blind_debug_str}. Position value invalid ${value} (valid range is [0,100])`);
@@ -203,14 +262,14 @@ export class ShuttersController {
     // try {
     // this.debug(`${blind.displayName} => perform call ${url}`);
     const result: FBXRequestResult = await this.freeboxRequest.request(
-      http_method,
+      cmd.http_method,
       url,
       payload,
       RetryPolicy.NO_RETRY);
     // RetryPolicy.AUTO_RETRY);
     // this.debug(`${blind.displayName} => call result = ${JSON.stringify(result)}`);
     if (result === null) {
-      throw new Error(`Failed to send ${url} ${http_method} ${blind_debug_str}. No HTTP body response`);
+      throw new Error(`Failed to send ${url} ${cmd.http_method} ${blind_debug_str}. No HTTP body response`);
     }
     const data: FBXEndPointResult = result.data as FBXEndPointResult;
     // this.debug(`${blind.displayName} => ${JSON.stringify(data)}`);
@@ -219,14 +278,14 @@ export class ShuttersController {
       // all strings below are for linter
       const msg_info = 'No "success" in reply';
       const msg_additional_data = `statusCode=${result.status_code} body=${JSON.stringify(data)}`;
-      this.warn(`${url} ${http_method} -> ${blind_debug_str} -> ${msg_info}`);
-      this.warn(`${url} ${http_method} -> ${blind_debug_str} -> ${msg_additional_data}`);
+      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_info}`);
+      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_additional_data}`);
       // const err_msg_perfix = `${url} ${http_method} ${blind_debug_str}`;
       // const err_msg = `${err_msg_perfix}. ${msg_info}. ${msg_additional_data}`;
       // throw new Error(err_msg);
       return null;
     } else if (data.success === false) {
-      this.warn(`${url} ${http_method} -> ${blind_debug_str} -> success was false. No value found`);
+      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> success was false. No value found`);
       return null;
     } else {
       return data.result;
@@ -234,14 +293,19 @@ export class ShuttersController {
   }
 
 
-  async getBlindTargetPosition(blind_index: number): Promise<BlindPosValue> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async getBlindTargetPosition(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<BlindPosValue> {
+    // const blind = this.getBlindAtIndex(blind_index);
     // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
-      blind_index,
-      'position_set',
-      'w',
-      'GET', // get the write data in GET mode ?!
+      // blind_index,
+      blind,
+      blind.getTargetPos,
+      // 'position_set',
+      // 'w',
+      // 'GET', // get the write data in GET mode ?!
       null,
     );
     if (rval !== null && rval !== undefined) {
@@ -256,23 +320,28 @@ export class ShuttersController {
       } else {
         throw new EvalError(`No value type in reply ? ${JSON.stringify(rval)}`);
       }
-      if (rval.refresh !== null && rval.refresh !== undefined) {
-        this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
-        this.debug('sleep for '+ rval.refresh+ ' ms');
-        await sleep(rval.refresh, '');
-      }
+      // if (rval.refresh !== null && rval.refresh !== undefined) {
+      //   this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+      //   this.debug('sleep for ' + rval.refresh + ' ms');
+      //   await sleep(rval.refresh, '');
+      // }
     }
     return { value: blind.current_target_position };
   }
 
-  async getBlindCurrentPosition(blind_index: number): Promise<BlindPosValue> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async getBlindCurrentPosition(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<BlindPosValue> {
+    // const blind = this.getBlindAtIndex(blind_index);
     // this.debug('getBlindCurrentPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
-      blind_index,
-      'position_set',
-      'r',
-      'GET',
+      // blind_index,
+      blind,
+      blind.getPos,
+      // 'position_set',
+      // 'r',
+      // 'GET',
       null,
     );
     if (rval !== null && rval !== undefined) {
@@ -286,24 +355,29 @@ export class ShuttersController {
       } else {
         throw new EvalError(`Expected int type for result... no value type defined ?! ${JSON.stringify(rval)}`);
       }
-      if (rval.refresh !== null && rval.refresh !== undefined) {
-        this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
-        this.debug('sleep for '+ rval.refresh+ ' ms');
-        await sleep(rval.refresh, '');
-      }
+      // if (rval.refresh !== null && rval.refresh !== undefined) {
+      //   this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+      //   this.debug('sleep for ' + rval.refresh + ' ms');
+      //   await sleep(rval.refresh, '');
+      // }
     }
     return { value: blind.current_position };
   }
 
-  async setBlindPosition(blind_index: number, value: number): Promise<boolean> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async setBlindPosition(
+    // blind_index: number,
+    blind: FBXBlind,
+    value: number): Promise<boolean> {
+    // const blind = this.getBlindAtIndex(blind_index);
     // this.debug('setBlindPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
-      blind_index,
-      //   'setBlindPosition',
-      'position_set',
-      'w',
-      'PUT',
+      // blind_index,
+      blind,
+      blind.setTargetPos,
+      // //   'setBlindPosition',
+      // 'position_set',
+      // 'w',
+      // 'PUT',
       value,
     );
     if (rval !== null) {
@@ -320,15 +394,20 @@ export class ShuttersController {
     return false;
   }
 
-  async stopBlind(blind_index: number): Promise<boolean> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async stopBlind(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<boolean> {
+    // const blind = this.getBlindAtIndex(blind_index);
     this.debug('stopBlind ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
-      blind_index,
-      //   'stopBlind',
-      'stop',
-      'w',
-      'PUT',
+      // blind_index,
+      blind,
+      blind.stop,
+      // //   'stopBlind',
+      // 'stop',
+      // 'w',
+      // 'PUT',
       true,
     );
     if (rval !== null) {
@@ -342,15 +421,20 @@ export class ShuttersController {
     return false;
   }
 
-  async toggleBlind(blind_index: number): Promise<boolean> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async toggleBlind(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<boolean> {
+    // const blind = this.getBlindAtIndex(blind_index);
     this.debug('toggleBlind ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
-      blind_index,
-      //   'toggleBlind',
-      'toggle',
-      'w',
-      'PUT',
+      // blind_index,
+      blind,
+      blind.toggle,
+      // //   'toggleBlind',
+      // 'toggle',
+      // 'w',
+      // 'PUT',
       true,
     );
     if (rval !== null) {
@@ -364,15 +448,21 @@ export class ShuttersController {
     return false;
   }
 
-  async openBlind(blind_index: number): Promise<boolean> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async openBlind(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<boolean> {
+    // const blind = this.getBlindAtIndex(blind_index);
     this.debug('openBlind ' + blind.displayName + '@' + blind.nodeid);
-    return this.setBlindPosition(blind_index, 0);
+    return this.setBlindPosition(blind, 0);
   }
 
-  async closeBlind(blind_index: number): Promise<boolean> {
-    const blind = this.getBlindAtIndex(blind_index);
+  async closeBlind(
+    // blind_index: number,
+    blind: FBXBlind,
+  ): Promise<boolean> {
+    // const blind = this.getBlindAtIndex(blind_index);
     this.debug('closeBlind ' + blind.displayName + '@' + blind.nodeid);
-    return this.setBlindPosition(blind_index, 100);
+    return this.setBlindPosition(blind, 100);
   }
 }

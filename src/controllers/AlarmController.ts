@@ -35,8 +35,8 @@ export class AlarmController {
   private isArming: boolean = false;
   private freeboxRequest!: FreeboxRequest;
 
-  private alarmKindEndPointsMap: Map<AlarmKind, number>= new Map<AlarmKind, number>();
-  private stateEndPoint : number = -1;
+  private alarmKindEndPointsMap: Map<AlarmKind, number> = new Map<AlarmKind, number>();
+  private stateEndPoint: number = -1;
 
   constructor(
     public readonly log: Logging,
@@ -120,7 +120,7 @@ export class AlarmController {
     return null;
   }
 
-  async refreshAlarmTarget() {
+  async getAlarmKind(): Promise<AlarmKind> {
     if (this.storedAlarmNode) {
       // const ep_id = this.getStateEndpoint();
       const url = `${this.apiUrl}/home/endpoints/${this.storedAlarmNode.id}/${this.stateEndPoint}`;
@@ -173,26 +173,26 @@ export class AlarmController {
   //   return this.getEndpointIdWithName('state');
   // }
 
-  private getEndpointIdWithName(name: string): number {
-    if (this.storedAlarmNode) {
-      let id = 0;
-      for (const endpoint of this.storedAlarmNode.type.endpoints) {
-        if (endpoint.name === name) {
-          return id;
-        } else {
-          id++;
-        }
-      }
-    }
-    throw Error(`endpoint with name ${name} not found ...`);
-  }
+  // private getEndpointIdWithName(name: string): number {
+  //   if (this.storedAlarmNode) {
+  //     let id = 0;
+  //     for (const endpoint of this.storedAlarmNode.type.endpoints) {
+  //       if (endpoint.name === name) {
+  //         return id;
+  //       } else {
+  //         id++;
+  //       }
+  //     }
+  //   }
+  //   throw Error(`endpoint with name ${name} not found ...`);
+  // }
 
   private async checkAlarmActivable(target: AlarmKind): Promise<boolean> {
     if (this.storedAlarmNode) {
       if (!this.isArming) {
         const state: AlarmState | null = await this.getAlarmState();
         if (state && state.includes(target.toString())) { // TODO: better/more explicit code ?
-          this.info(`About to activate [${target}] while state is [${state}]`);
+          this.info(`About to activate [${target}] while state is already [${state}]`);
           return false;
         }
         if (state !== AlarmState.idle) {
@@ -272,9 +272,9 @@ export class AlarmController {
     }
   }
 
-  async getAlarmTarget(): Promise<AlarmKind> { //callback: Callback<number>) {
-    return this.storedAlarmTarget;
-  }
+  // async getAlarmTarget(): Promise<AlarmKind> { //callback: Callback<number>) {
+  //   return this.storedAlarmTarget;
+  // }
 
   // async setAlarmDisabled(): Promise<boolean> {
   //   if (this.storedAlarmNode) {

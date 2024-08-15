@@ -21,21 +21,20 @@ import { BlindPosValue, FBXBlind, ShuttersController } from './controllers/Shutt
 export class FBXShutters {
   private service: Service;
   private shutterDevice: FBXBlind;
-  // private controllerShutterIndex: number;
   private currentPosition: number;
   private previousPosition: number;
   private previousTargetPosition: number;
   private currentTargetPosition: number;
   private debugName: string;
+  private shuttersRefreshRateMilliSeconds: number;
 
   constructor(
     private readonly platform: FreeboxPlatform,
     private readonly accessory: PlatformAccessory,
     private readonly shuttersController: ShuttersController,
-    private readonly controllerShutterIndex: number,
-    private readonly shuttersRefreshRateMilliSeconds: number,
   ) {
     this.shutterDevice = accessory.context.device as FBXBlind;
+    this.shuttersRefreshRateMilliSeconds = this.platform.config.shuttersRefreshRateMilliSeconds;
     this.platform.log.info('Create shutter ' + this.shutterDevice.displayName + ' ' + this.shutterDevice.nodeid);
     this.debugName = `${this.shutterDevice.displayName}@${this.shutterDevice.nodeid}`;
     // set accessory information
@@ -120,7 +119,7 @@ export class FBXShutters {
 
     this.platform.log.info('Wait 5 sec');
     setImmediate(async () => {
-      const finished = await sleep(5000, '');
+      const _finished = await sleep(5000, '');
       this.platform.log.info('Timer finished !');
     });
 
@@ -130,13 +129,13 @@ export class FBXShutters {
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.currentPosition);
     }, this.shuttersRefreshRateMilliSeconds);
     setImmediate(async () => {
-      const finished = await sleep(1000, '');
+      const _finished = await sleep(1000, '');
     });
     setInterval(async () => {
       await this.updateCurrentTargetPosition();
     }, this.shuttersRefreshRateMilliSeconds);
     setImmediate(async () => {
-      const finished = await sleep(1000, '');
+      const _finished = await sleep(1000, '');
     });
     setInterval(async () => {
       const trend = this.updateTrends();
@@ -166,7 +165,7 @@ export class FBXShutters {
 
   private async updateCurrentPosition(doPublish: boolean = true) {
     const funcname = "updateCurrentPosition";
-    const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.controllerShutterIndex);
+    const currentPos: BlindPosValue = await this.shuttersController.getBlindCurrentPosition(this.shutterDevice);
     if (currentPos.value !== null) {
       // apple convention  : 100 = OPEN /   0 = CLOSED
       // Freebox convention: 0   = OPEN / 100 = CLOSED
@@ -186,7 +185,7 @@ export class FBXShutters {
   }
   private async updateCurrentTargetPosition(doPublish: boolean = true): Promise<boolean> {
     const funcname = "updateCurrentTargetPosition";
-    const currentTargetPos: BlindPosValue = await this.shuttersController.getBlindTargetPosition(this.controllerShutterIndex);
+    const currentTargetPos: BlindPosValue = await this.shuttersController.getBlindTargetPosition(this.shutterDevice);
     if (currentTargetPos.value !== null) {
       const apple_convention_pos: number = Math.abs(100 - currentTargetPos.value);
       if (currentTargetPos.value > 100 || currentTargetPos.value < 0) {
@@ -228,7 +227,7 @@ export class FBXShutters {
     //switch to FBX convention
     const fbx_convention_pos: number = 100 - posVal;
     // if(fbx_convention_pos !== this.currentPosition) {
-    const status: boolean = await this.shuttersController.setBlindPosition(this.controllerShutterIndex, fbx_convention_pos);
+    const status: boolean = await this.shuttersController.setBlindPosition(this.shutterDevice, fbx_convention_pos);
     if (status) {
       this.previousTargetPosition = this.currentTargetPosition;
       this.currentTargetPosition = posVal;

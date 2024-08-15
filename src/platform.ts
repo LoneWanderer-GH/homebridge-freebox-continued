@@ -1,6 +1,7 @@
 import { API, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
 
 import { Network } from './network/Network.js';
+// import { FreeboxWebSocket } from './network/WebSocket.js';
 import { FBXShutters } from './platformAccessoryFBXShutters.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 // import { FreeboxSession } from "./freeboxOS/FreeboxSession.js";
@@ -13,7 +14,7 @@ import { AlarmController } from './controllers/AlarmController.js';
 import { NodesController } from './controllers/NodesController.js';
 import { FBXBlind, ShuttersController } from './controllers/ShuttersController.js';
 import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
-import { FreeboxController } from './freeboxOS/FreeboxApi.js';
+import { FBXAPI, FreeboxController } from './freeboxOS/FreeboxApi.js';
 import { FBXAlarm } from './platformAccessoryFBXAlarm.js';
 // import * as express from 'express';
 
@@ -53,9 +54,10 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.Characteristic = api.hap.Characteristic;
 
     this.authFilePath = path.join(this.api.user.storagePath(), 'freebox-auth.json');
-    const freeboxApiVersion: string = this.config.apiVersion;
+    const _freeboxApiVersion: string = this.config.apiVersion;
     const freeboxIPAddress: string = this.config.freeBoxAddress;
     //const shuttersRefreshRateMilliSeconds:string = this.config.shuttersRefreshRateMilliSeconds;
+
 
     this.fbxNetwork = new Network(this.log);
     this.fbxAPIController = new FreeboxController(this.log,
@@ -73,26 +75,27 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.api.on('didFinishLaunching', async () => {
       log.debug('Executed didFinishLaunching callback');
 
-      const apiUrl: string = await this.fbxAPIController.getActualApiUrl();
+      const apiUrl: FBXAPI = await this.fbxAPIController.getActualApiUrl();
 
-      const fbxSession = new FreeboxSession(this.log, this.fbxNetwork, apiUrl); // this.freeboxAddress, this.freeboxApiVersion);
+      const fbxSession = new FreeboxSession(this.log, this.fbxNetwork, apiUrl.httpsUrl); // this.freeboxAddress, this.freeboxApiVersion);
       const fbxRequest = new FreeboxRequest(this.log, this.fbxNetwork, fbxSession); // freeboxIPAddress, freeboxApiVersion);
-      const nodesCtrl = new NodesController(this.log, fbxRequest, apiUrl);
+      const nodesCtrl = new NodesController(this.log, fbxRequest, apiUrl.httpsUrl);
 
       const auth_sucess: boolean = await this.initializeAuth(fbxRequest);
       if (auth_sucess) {
 
+        // const _ws: FreeboxWebSocket = new FreeboxWebSocket(this.log, apiUrl.webSocketurl, fbxRequest.credentials);
         this.alarmController = new AlarmController(
           this.log,
           fbxRequest,
-          apiUrl,
+          apiUrl.httpsUrl,
           // freeboxIPAddress,
           // freeboxApiVersion,
         );
         this.shuttersController = new ShuttersController(
           this.log,
           fbxRequest,
-          apiUrl,
+          apiUrl.httpsUrl,
           // freeboxIPAddress,
           // freeboxApiVersion,
         );
@@ -171,8 +174,8 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.log.info('Get shutters/blinds');
     const shutters: Array<FBXBlind> = this.shuttersController.getBlinds(nodes);
     this.log.info('Found from Freebox ' + shutters.length + 'shutters');
-    let createdShutters: Array<FBXShutters> = []
-    for (const [index, shutter] of shutters.entries()) {
+    // let createdShutters: Array<FBXShutters> = [];
+    for (const [_index, shutter] of shutters.entries()) {
       const uuid = this.api.hap.uuid.generate(shutter.nodeid + shutter.displayName);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       if (existingAccessory) {
@@ -185,13 +188,12 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the restored accessory
         // this is imported from `platformAccessory.ts`
-        createdShutters.push(
-          new FBXShutters(this,
-            existingAccessory,
-            this.shuttersController,
-            index,
-            this.config.shuttersRefreshRateMilliSeconds)
+        // createdShutters.push(
+        new FBXShutters(this,
+          existingAccessory,
+          this.shuttersController,
         );
+        // );
 
         // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
         // remove platform accessories when no longer present
@@ -210,13 +212,12 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
 
         // create the accessory handler for the newly create accessory
         // this is imported from `platformAccessory.ts`
-        createdShutters.push(
-          new FBXShutters(this,
-            accessory,
-            this.shuttersController,
-            index,
-            this.config.shuttersRefreshRateMilliSeconds)
+        // createdShutters.push(
+        new FBXShutters(this,
+          accessory,
+          this.shuttersController,
         );
+        // );
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);

@@ -7,12 +7,12 @@ export class NodesController {
   private freeboxRequest!: FreeboxRequest;
 
   constructor(
-        public readonly log: Logging,
-        freeboxRequest: FreeboxRequest,
-        private readonly apiUrl: string,
+    public readonly log: Logging,
+    freeboxRequest: FreeboxRequest,
+    private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
-    this.debug('Create Alarm controller');
+    this.debug('Create Nodes controller');
   }
 
   private debug(s: string) {

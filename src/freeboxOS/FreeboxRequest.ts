@@ -39,7 +39,7 @@ export class FreeboxRequest {
   private requestQueue: RequestQueueItem[] = [];
 
   // private freeboxSession: FreeboxSession;
-  private credentials: FBXSessionCredentials;
+  public credentials: FBXSessionCredentials;
 
   constructor(
     public readonly log: Logging,

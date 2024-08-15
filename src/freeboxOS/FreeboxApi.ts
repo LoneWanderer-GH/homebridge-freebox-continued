@@ -18,6 +18,12 @@ export interface FBXApiVersion {
   device_type: string; //: "FreeboxServer7,1"
 }
 
+export interface FBXAPI {
+  httpUrl: string;
+  httpsUrl: string;
+  webSocketurl: string;
+}
+
 
 export class FreeboxController {
   // private freeboxRequest!: FreeboxRequest;
@@ -30,7 +36,7 @@ export class FreeboxController {
     private readonly freeboxAddress: string,
   ) {
     // this.freeboxRequest = freeboxRequest;
-    this.apiInfoUrl = `http://${this.freeboxAddress}/api_version`;
+    this.apiInfoUrl = `https://${this.freeboxAddress}/api_version`;
   }
 
   private debug(s: string) {
@@ -53,7 +59,7 @@ export class FreeboxController {
     this.log.success(`FreeboxController -> ${s}`);
   }
 
-  async getActualApiUrl(): Promise<string> {
+  async getActualApiUrl(): Promise<FBXAPI> {
     this.info('Discovering Freebox API configuration');
     const apiVersionData: FBXRequestResult = await this.network.request(
       'GET',
@@ -61,10 +67,15 @@ export class FreeboxController {
       {},
       null);
     if (apiVersionData.status_code === 200) {
-      this.success('Freebox API configuration '+ JSON.stringify(apiVersionData));
+      this.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
       const apiInfo: FBXApiVersion = apiVersionData.data as FBXApiVersion;
       const majorVersion = apiInfo.api_version.split('.')[0];
-      return `http://${this.freeboxAddress}${apiInfo.api_base_url}v${majorVersion}`;
+      return {
+        httpUrl: `http://${this.freeboxAddress}${apiInfo.api_base_url}v${majorVersion}`,
+        // httpsUrl: `https://${this.freeboxAddress}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}`,
+        httpsUrl: `https://${apiInfo.api_domain}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}`,
+        webSocketurl: `wss://${apiInfo.api_domain}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}/ws`,
+      };
     } else {
       this.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
       this.warn(JSON.stringify(apiVersionData));
