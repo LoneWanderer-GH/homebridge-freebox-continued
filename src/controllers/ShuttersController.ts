@@ -361,7 +361,7 @@ export class ShuttersController {
       //   await sleep(rval.refresh, '');
       // }
     }
-    return { value: blind.current_position };
+    return { value: blind.current_position ? Math.min(blind.current_position, 100) : null };
   }
 
   async setBlindPosition(

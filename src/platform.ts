@@ -1,23 +1,21 @@
+// homebridge
 import { API, Characteristic, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig, Service } from 'homebridge';
-
+// us
 import { Network } from './network/Network.js';
-// import { FreeboxWebSocket } from './network/WebSocket.js';
 import { FBXShutters } from './platformAccessoryFBXShutters.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
-// import { FreeboxSession } from "./freeboxOS/FreeboxSession.js";
-import * as fs from 'fs';
-import * as path from 'path';
 import { FreeboxRequest } from './freeboxOS/FreeboxRequest.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession } from './freeboxOS/FreeboxSession.js';
-// import { AlarmController } from './controllers/AlarmController.js';
 import { AlarmController } from './controllers/AlarmController.js';
 import { NodesController } from './controllers/NodesController.js';
 import { FBXBlind, ShuttersController } from './controllers/ShuttersController.js';
 import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
 import { FBXAPI, FreeboxController } from './freeboxOS/FreeboxApi.js';
 import { FBXAlarm } from './platformAccessoryFBXAlarm.js';
-// import * as express from 'express';
-
+// others
+import * as fs from 'fs';
+import * as path from 'path';
+import { setTimeout as sleep } from 'timers/promises';
 
 /**
  * FreeboxPlatform
@@ -58,8 +56,9 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     const freeboxIPAddress: string = this.config.freeBoxAddress;
     //const shuttersRefreshRateMilliSeconds:string = this.config.shuttersRefreshRateMilliSeconds;
 
-
-    this.fbxNetwork = new Network(this.log);
+    this.fbxNetwork = new Network(this.log,
+      this.config.useHTTPS,
+    );
     this.fbxAPIController = new FreeboxController(this.log,
       this.fbxNetwork,
       freeboxIPAddress,
@@ -74,28 +73,35 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     // to start discovery of new accessories.
     this.api.on('didFinishLaunching', async () => {
       log.debug('Executed didFinishLaunching callback');
-
+      let actualApiUrl: string = '';
       const apiUrl: FBXAPI = await this.fbxAPIController.getActualApiUrl();
-
-      const fbxSession = new FreeboxSession(this.log, this.fbxNetwork, apiUrl.httpsUrl); // this.freeboxAddress, this.freeboxApiVersion);
+      if (this.config.useHTTPS) {
+        actualApiUrl = apiUrl.httpsUrl;
+      } else {
+        actualApiUrl = apiUrl.httpUrl;
+      }
+      // const apiInfo: FBXApiVersion = this.fbxAPIController.getApiInfo();
+      // this.fbxNetwork.setHTTPSinfo(
+      //   apiInfo.api_domain,
+      //   apiInfo.https_port);
+      const fbxSession = new FreeboxSession(this.log, this.fbxNetwork, actualApiUrl); // this.freeboxAddress, this.freeboxApiVersion);
       const fbxRequest = new FreeboxRequest(this.log, this.fbxNetwork, fbxSession); // freeboxIPAddress, freeboxApiVersion);
-      const nodesCtrl = new NodesController(this.log, fbxRequest, apiUrl.httpsUrl);
+      const nodesCtrl = new NodesController(this.log, fbxRequest, actualApiUrl);
 
       const auth_sucess: boolean = await this.initializeAuth(fbxRequest);
       if (auth_sucess) {
-
         // const _ws: FreeboxWebSocket = new FreeboxWebSocket(this.log, apiUrl.webSocketurl, fbxRequest.credentials);
         this.alarmController = new AlarmController(
           this.log,
           fbxRequest,
-          apiUrl.httpsUrl,
+          actualApiUrl,
           // freeboxIPAddress,
           // freeboxApiVersion,
         );
         this.shuttersController = new ShuttersController(
           this.log,
           fbxRequest,
-          apiUrl.httpsUrl,
+          actualApiUrl,
           // freeboxIPAddress,
           // freeboxApiVersion,
         );
@@ -106,8 +112,6 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
       }
     });
   }
-
-
 
   async initializeAuth(
     fbxRequest: FreeboxRequest,
@@ -126,8 +130,6 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
   async startFreeboxAuthentication(
     fbxRequest: FreeboxRequest,
     authInfo: FBXAuthInfo,
-    // token: string,
-    // trackId: number
   ): Promise<boolean> {
     const sessionCredentials: FBXSessionCredentials = await fbxRequest.freeboxAuth(authInfo); // token, trackId);
     if (sessionCredentials.token !== null && sessionCredentials.token !== 'null') {
@@ -141,8 +143,6 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.log.error(`Could not authenticate as an app with Freebox. Received credential data ${JSON.stringify(sessionCredentials)}`);
     return false;
   }
-
-
 
   /**
    * This function is invoked when homebridge restores cached accessories from disk at startup.
@@ -222,6 +222,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
+      await sleep(800, '');
     }
   }
 
@@ -236,7 +237,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       if (existingAccessory) {
         // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
 
         // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
         existingAccessory.context.device = alarmNode;

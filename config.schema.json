@@ -7,7 +7,7 @@
     "properties": {
       "name": {
         "title": "Name",
-        "description": "FreeboxHome",
+        "description": "Plugin name as displayed in the homebridge log.",
         "type": "string",
         "required": true,
         "default": "FreeboxHome"
@@ -26,12 +26,26 @@
         "required": true,
         "default": "mafreebox.freebox.fr"
       },
-      "shuttersRefreshRateMilliSeconds" :{
+      "shuttersRefreshRateMilliSeconds": {
         "title": "Window shutters refresh rate (in milliseconds)",
         "description": "how often to ask Freebox for shutters info",
-        "type": "string",
+        "type": "number",
         "required": true,
-        "default": 4000
+        "default": 20000
+      },
+      "alarmRefreshRateMilliSeconds": {
+        "title": "Alarm refresh rate (in milliseconds)",
+        "description": "how often to ask Freebox for alarm info",
+        "type": "number",
+        "required": true,
+        "default": 30000
+      },
+      "useHTTPS": {
+        "title": "try to use HTTPS ? UNSTABLE !",
+        "description": "use at your own risk ...",
+        "type": "boolean",
+        "required": false,
+        "default": false
       }
     }
   }

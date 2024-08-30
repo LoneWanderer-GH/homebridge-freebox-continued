@@ -2,6 +2,7 @@ import { Logging } from 'homebridge';
 import { FBXRequestResult, Network } from '../network/Network.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession, FBXLoginSessionReply } from './FreeboxSession.js';
 
+import { setTimeout as sleep } from 'timers/promises';
 
 export interface StoredCredentials {
   trackId: number | null;
@@ -271,6 +272,7 @@ export class FreeboxRequest {
     reject: (reason?: any) => void,
   ): Promise<void> {
     while (this.requestQueue.length > 0) {
+      await sleep(250, '');
       const next = this.requestQueue.shift();
       if (next) {
         try {

@@ -117,30 +117,30 @@ export class FBXShutters {
       }
     });
 
-    this.platform.log.info('Wait 5 sec');
-    setImmediate(async () => {
-      const _finished = await sleep(5000, '');
-      this.platform.log.info('Timer finished !');
-    });
+    // this.platform.log.info('Wait 5 sec');
+    // setImmediate(async () => {
+    //   const _finished = await sleep(5000, '');
+    //   this.platform.log.info('Timer finished !');
+    // });
 
     this.platform.log.info('Start periodic timer');
     setInterval(async () => {
       await this.updateCurrentPosition();
       this.service.updateCharacteristic(this.platform.Characteristic.CurrentPosition, this.currentPosition);
     }, this.shuttersRefreshRateMilliSeconds);
-    setImmediate(async () => {
-      const _finished = await sleep(1000, '');
-    });
+    // setImmediate(async () => {
+    //   const _finished = await sleep(1000, '');
+    // });
     setInterval(async () => {
       await this.updateCurrentTargetPosition();
-    }, this.shuttersRefreshRateMilliSeconds);
-    setImmediate(async () => {
-      const _finished = await sleep(1000, '');
-    });
+    }, this.shuttersRefreshRateMilliSeconds + 250);
+    // setImmediate(async () => {
+    //   const _finished = await sleep(1000, '');
+    // });
     setInterval(async () => {
       const trend = this.updateTrends();
       this.service.updateCharacteristic(this.platform.Characteristic.PositionState, trend);
-    }, this.shuttersRefreshRateMilliSeconds);
+    }, this.shuttersRefreshRateMilliSeconds + 500);
   }
 
   private debug(s: string) {
@@ -190,7 +190,7 @@ export class FBXShutters {
     if (currentTargetPos.value !== null) {
       const apple_convention_pos: number = Math.abs(100 - currentTargetPos.value);
       if (currentTargetPos.value > 100 || currentTargetPos.value < 0) {
-        this.platform.log.error(`${funcname} FBX pos = ${currentTargetPos.value} / apple pos=${apple_convention_pos}`);
+        this.platform.log.error(`${funcname} ${this.debugName} FBX pos = ${currentTargetPos.value} / apple pos=${apple_convention_pos}`);
       }
       this.previousTargetPosition = this.currentTargetPosition;
       this.currentTargetPosition = apple_convention_pos;

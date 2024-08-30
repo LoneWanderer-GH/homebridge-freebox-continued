@@ -26,9 +26,11 @@ export interface FBXAPI {
 
 
 export class FreeboxController {
+
   // private freeboxRequest!: FreeboxRequest;
   private apiInfoUrl: string;
   private apiInfoRetryDelayMs: number = 2000;
+  public apiInfo: FBXApiVersion | null = null;
 
   constructor(
     public readonly log: Logging,
@@ -36,7 +38,7 @@ export class FreeboxController {
     private readonly freeboxAddress: string,
   ) {
     // this.freeboxRequest = freeboxRequest;
-    this.apiInfoUrl = `https://${this.freeboxAddress}/api_version`;
+    this.apiInfoUrl = `http://${this.freeboxAddress}/api_version`;
   }
 
   private debug(s: string) {
@@ -59,6 +61,13 @@ export class FreeboxController {
     this.log.success(`FreeboxController -> ${s}`);
   }
 
+  getApiInfo(): FBXApiVersion {
+    if (this.apiInfo === null) {
+      throw Error('NOT YET OBTAINED ?!');
+    }
+    return this.apiInfo;
+  }
+
   async getActualApiUrl(): Promise<FBXAPI> {
     this.info('Discovering Freebox API configuration');
     const apiVersionData: FBXRequestResult = await this.network.request(
@@ -68,13 +77,13 @@ export class FreeboxController {
       null);
     if (apiVersionData.status_code === 200) {
       this.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
-      const apiInfo: FBXApiVersion = apiVersionData.data as FBXApiVersion;
-      const majorVersion = apiInfo.api_version.split('.')[0];
+      this.apiInfo = apiVersionData.data as FBXApiVersion;
+      const majorVersion = this.apiInfo.api_version.split('.')[0];
       return {
-        httpUrl: `http://${this.freeboxAddress}${apiInfo.api_base_url}v${majorVersion}`,
-        // httpsUrl: `https://${this.freeboxAddress}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}`,
-        httpsUrl: `https://${apiInfo.api_domain}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}`,
-        webSocketurl: `wss://${apiInfo.api_domain}:${apiInfo.https_port}${apiInfo.api_base_url}v${majorVersion}/ws`,
+        httpUrl: `http://${this.freeboxAddress}${this.apiInfo.api_base_url}v${majorVersion}`,
+        httpsUrl: `https://${this.freeboxAddress}${this.apiInfo.api_base_url}v${majorVersion}`,
+        // httpsUrl: `https://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}`,
+        webSocketurl: `wss://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}/ws`,
       };
     } else {
       this.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
