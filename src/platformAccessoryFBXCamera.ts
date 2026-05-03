@@ -1,141 +1,213 @@
-import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-
+import {
+  API,
+  // AccessoryPlugin,
+  // CharacteristicEventTypes,
+  // CharacteristicSetCallback,
+  // CharacteristicValue,
+  // Controller,
+  HAP,
+  PlatformAccessory,
+  Service } from 'homebridge';
 import { FreeboxPlatform } from './platform.js';
+import { StreamingDelegate } from './ffmpeg-camera/streamingDelegate.js';
+import { CameraConfig, VideoConfig } from './ffmpeg-camera/configTypes.js';
+import { CameraController as FBXCameraController, FBXCameraInstance } from './controllers/CameraController.js';
+
+
+// export type AutomationReturn = {
+//   error: boolean;
+//   message: string;
+//   cooldownActive?: boolean;
+// };
 
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
-export class FBXCamera {
+export class FBXCamera /*implements AccessoryPlugin*/ {
   private service: Service;
+  private cameraInstance: FBXCameraInstance;
+  private streamingDelegate? : StreamingDelegate;
+  private api : API;
+  private hap : HAP;
 
-  /**
-   * These are just used to create a working example
-   * You should implement your own code to track the state of your accessory
-   */
-  private exampleStates = {
-    On: false,
-    Brightness: 100,
-  };
+  private cameraConfig?: CameraConfig;
+
+  // private readonly motionTimers: Map<string, NodeJS.Timeout> = new Map();
+
+  // private readonly cameraControlService?: Service;
+  // private readonly cameraStreamManagementService?: Service;
+  // private readonly informationService?: Service;
 
   constructor(
     private readonly platform: FreeboxPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly fbxCameraController : FBXCameraController,
   ) {
-
-    // set accessory information
+    this.api = this.platform.api;
+    this.hap = this.platform.api.hap;
+    this.cameraInstance = accessory.context.device as FBXCameraInstance;
+    // let rtspActivated : boolean = false;
+    // setImmediate(async () => {
+    //   rtspActivated = await this.fbxCameraController.activateRTSP(this.cameraInstance);
+    // },
+    // );
+    // if (rtspActivated) {
+    const videoConfig : VideoConfig = {
+      source: `-re -i rtsp://${this.cameraInstance.ip}/live`,
+      maxStreams: 2,
+      maxWidth: 1280,
+      maxHeight: 720,
+      maxBitrate: 1000,
+      maxFPS: 15,
+      audio: false,
+      // additionalCommandline: '-pix_fmt yuv420p -x264-params intra-refresh=1:bframes=0',
+    };
+    this.cameraConfig = {
+      name : this.cameraInstance.node_data.label,
+      manufacturer : 'Freebox',
+      model : 'RocketCam',
+      serialNumber : '13377',
+      firmwareRevision : '',
+      motion : true,
+      videoConfig : videoConfig,
+    };
+    // if (this.cameraConfig.motion) {
+    //   const motionSensor = new this.hap.Service.MotionSensor(this.cameraConfig.name);
+    //   accessory.addService(motionSensor);
+    //   if (this.cameraConfig.switches) {
+    //     const motionTrigger = new this.hap.Service.Switch(this.cameraConfig.name + ' Motion Trigger', 'MotionTrigger');
+    //     motionTrigger
+    //       .getCharacteristic(this.hap.Characteristic.On)
+    //       .on(CharacteristicEventTypes.SET, (state: CharacteristicValue, callback: CharacteristicSetCallback) => {
+    //         this.motionHandler(accessory, state as boolean, 1);
+    //         callback();
+    //       });
+    //     accessory.addService(motionTrigger);
+    //   }
+    // }
+    this.streamingDelegate = new StreamingDelegate(
+      this.platform.log,
+      this.cameraConfig,
+      this.api,
+      this.hap,
+    );
+    // this.informationService = accessory.getService(this.hap.Service.AccessoryInformation)!;
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.hap.Characteristic.Manufacturer, this.cameraConfig.manufacturer || 'Homebridge')
+      .setCharacteristic(this.hap.Characteristic.Model, this.cameraConfig.model || 'Camera FFmpeg')
+      .setCharacteristic(this.hap.Characteristic.SerialNumber, this.cameraConfig.serialNumber || 'SerialNumber')
+      .setCharacteristic(this.hap.Characteristic.FirmwareRevision, this.cameraConfig.firmwareRevision || '');
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Lightbulb) || this.accessory.addService(this.platform.Service.Lightbulb);
+    // this.accessory.category = this.api.hap.Categories.IP_CAMERA;
+    this.accessory.category = this.api.hap.Categories.CAMERA;
+      
+    this.service = this.accessory.getService(this.platform.Service.CameraRTPStreamManagement)
+    || this.accessory.addService(this.platform.Service.CameraRTPStreamManagement);
 
-    // set the service name, this is what is displayed as the default name on the Home app
-    // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.exampleDisplayName);
-
-    // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
-
-    // register handlers for the On/Off Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.On)
-      .onSet(this.setOn.bind(this))                // SET - bind to the `setOn` method below
-      .onGet(this.getOn.bind(this));               // GET - bind to the `getOn` method below
-
-    // register handlers for the Brightness Characteristic
-    this.service.getCharacteristic(this.platform.Characteristic.Brightness)
-      .onSet(this.setBrightness.bind(this));       // SET - bind to the 'setBrightness` method below
-
-    /**
-     * Creating multiple services of the same type.
-     *
-     * To avoid "Cannot add a Service with the same UUID another Service without also defining a unique 'subtype' property." error,
-     * when creating multiple services of the same type, you need to use the following syntax to specify a name and subtype id:
-     * this.accessory.getService('NAME') || this.accessory.addService(this.platform.Service.Lightbulb, 'NAME', 'USER_DEFINED_SUBTYPE_ID');
-     *
-     * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
-     * can use the same subtype id.)
-     */
-
-    // Example: add two "motion sensor" services to the accessory
-    const motionSensorOneService = this.accessory.getService('Motion Sensor One Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor One Name', 'YourUniqueIdentifier-1');
-
-    const motionSensorTwoService = this.accessory.getService('Motion Sensor Two Name') ||
-      this.accessory.addService(this.platform.Service.MotionSensor, 'Motion Sensor Two Name', 'YourUniqueIdentifier-2');
-
-    /**
-     * Updating characteristics values asynchronously.
-     *
-     * Example showing how to update the state of a Characteristic asynchronously instead
-     * of using the `on('get')` handlers.
-     * Here we change update the motion sensor trigger states on and off every 10 seconds
-     * the `updateCharacteristic` method.
-     *
-     */
-    let motionDetected = false;
-    setInterval(() => {
-      // EXAMPLE - inverse the trigger
-      motionDetected = !motionDetected;
-
-      // push the new value to HomeKit
-      motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
-      motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
-
-      this.platform.log.debug('Triggering motionSensorOneService:', motionDetected);
-      this.platform.log.debug('Triggering motionSensorTwoService:', !motionDetected);
-    }, 10000);
+    this.service.setCharacteristic(this.platform.Characteristic.Name, this.cameraInstance.node_data.label);
+    this.accessory.configureController(this.streamingDelegate.controller);
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, turning on a Light bulb.
-   */
-  async setOn(value: CharacteristicValue) {
-    // implement your own code to turn your device on/off
-    this.exampleStates.On = value as boolean;
+  // identify(): void {
+  //   // throw new Error('Method not implemented.');
+  //   this.info('Identify requested.', this.accessory.displayName);
+  // }
 
-    this.platform.log.debug('Set Characteristic On ->', value);
+  // getServices(): Service[] {
+  //   return [this.informationService!,
+  //     this.cameraControlService!,
+  //     this.cameraStreamManagementService!];
+  // }
+
+  // getControllers?(): Controller[] {
+  //   return this.streamingDelegate.controller;
+  // }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private debug(s: string, ...parameters: any[]) {
+    this.platform.log.debug(`FBXCamera -> ${s}`, parameters);
   }
 
-  /**
-   * Handle the "GET" requests from HomeKit
-   * These are sent when HomeKit wants to know the current state of the accessory, for example, checking if a Light bulb is on.
-   *
-   * GET requests should return as fast as possible. A long delay here will result in
-   * HomeKit being unresponsive and a bad user experience in general.
-   *
-   * If your device takes time to respond you should update the status of your device
-   * asynchronously instead using the `updateCharacteristic` method instead.
-
-   * @example
-   * this.service.updateCharacteristic(this.platform.Characteristic.On, true)
-   */
-  async getOn(): Promise<CharacteristicValue> {
-    // implement your own code to check if the device is on
-    const isOn = this.exampleStates.On;
-
-    this.platform.log.debug('Get Characteristic On ->', isOn);
-
-    // if you need to return an error to show the device as "Not Responding" in the Home app:
-    // throw new this.platform.api.hap.HapStatusError(this.platform.api.hap.HAPStatus.SERVICE_COMMUNICATION_FAILURE);
-
-    return isOn;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private info(s: string, ...parameters: any[]) {
+    this.platform.log.info(`FBXCamera -> ${s}`, parameters);
   }
 
-  /**
-   * Handle "SET" requests from HomeKit
-   * These are sent when the user changes the state of an accessory, for example, changing the Brightness
-   */
-  async setBrightness(value: CharacteristicValue) {
-    // implement your own code to set the brightness
-    this.exampleStates.Brightness = value as number;
-
-    this.platform.log.debug('Set Characteristic Brightness -> ', value);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private warn(s: string, ...parameters: any[]) {
+    this.platform.log.warn(`FBXCamera -> ${s}`, parameters);
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private error(s: string, ...parameters: any[]) {
+    this.platform.log.error(`FBXCamera -> ${s}`, parameters);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private success(s: string, ...parameters: any[]) {
+    this.platform.log.success(`FBXCamera -> ${s}`, parameters);
+  }
+
+  // private motionHandler(accessory: PlatformAccessory, active = true, minimumTimeout = 0): AutomationReturn {
+  //   const motionSensor = accessory.getService(this.hap.Service.MotionSensor);
+  //   if (motionSensor) {
+  //     this.debug('Switch motion detect ' + (active ? 'on.' : 'off.'), accessory.displayName);
+  //     const timeout = this.motionTimers.get(accessory.UUID);
+  //     if (timeout) {
+  //       clearTimeout(timeout);
+  //       this.motionTimers.delete(accessory.UUID);
+  //     }
+  //     const motionTrigger = accessory.getServiceById(this.hap.Service.Switch, 'MotionTrigger');
+  //     // const config = this.cameraConfigs.get(accessory.UUID);
+  //     if (active) {
+  //       motionSensor.updateCharacteristic(this.hap.Characteristic.MotionDetected, true);
+  //       if (motionTrigger) {
+  //         motionTrigger.updateCharacteristic(this.hap.Characteristic.On, true);
+  //       }
+  //       // if (!timeout && config?.motionDoorbell) {
+  //       //   this.doorbellHandler(accessory, true);
+  //       // }
+  //       let timeoutConfig = this.cameraConfig?.motionTimeout ?? 1;
+  //       if (timeoutConfig < minimumTimeout) {
+  //         timeoutConfig = minimumTimeout;
+  //       }
+  //       if (timeoutConfig > 0) {
+  //         const timer = setTimeout(() => {
+  //           this.debug('Motion handler timeout.', accessory.displayName);
+  //           this.motionTimers.delete(accessory.UUID);
+  //           motionSensor.updateCharacteristic(this.hap.Characteristic.MotionDetected, false);
+  //           if (motionTrigger) {
+  //             motionTrigger.updateCharacteristic(this.hap.Characteristic.On, false);
+  //           }
+  //         }, timeoutConfig * 1000);
+  //         this.motionTimers.set(accessory.UUID, timer);
+  //       }
+  //       return {
+  //         error: false,
+  //         message: 'Motion switched on.',
+  //         cooldownActive: !!timeout,
+  //       };
+  //     } else {
+  //       motionSensor.updateCharacteristic(this.hap.Characteristic.MotionDetected, false);
+  //       if (motionTrigger) {
+  //         motionTrigger.updateCharacteristic(this.hap.Characteristic.On, false);
+  //       }
+  //       // if (config?.motionDoorbell) {
+  //       //   this.doorbellHandler(accessory, false);
+  //       // }
+  //       return {
+  //         error: false,
+  //         message: 'Motion switched off.',
+  //       };
+  //     }
+  //   } else {
+  //     return {
+  //       error: true,
+  //       message: 'Motion is not enabled for this camera.',
+  //     };
+  //   }
+  // }
 
 }

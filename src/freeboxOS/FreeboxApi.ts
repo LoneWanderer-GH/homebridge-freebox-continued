@@ -74,15 +74,16 @@ export class FreeboxController {
       'GET',
       this.apiInfoUrl,
       {},
-      null);
+      null,
+      true);
     if (apiVersionData.status_code === 200) {
       this.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
       this.apiInfo = apiVersionData.data as FBXApiVersion;
       const majorVersion = this.apiInfo.api_version.split('.')[0];
       return {
         httpUrl: `http://${this.freeboxAddress}${this.apiInfo.api_base_url}v${majorVersion}`,
-        httpsUrl: `https://${this.freeboxAddress}${this.apiInfo.api_base_url}v${majorVersion}`,
-        // httpsUrl: `https://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}`,
+        // httpsUrl: `https://${this.freeboxAddress}${this.apiInfo.api_base_url}v${majorVersion}`,
+        httpsUrl: `https://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}`,
         webSocketurl: `wss://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}/ws`,
       };
     } else {

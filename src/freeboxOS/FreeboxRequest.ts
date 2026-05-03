@@ -2,7 +2,7 @@ import { Logging } from 'homebridge';
 import { FBXRequestResult, Network } from '../network/Network.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession, FBXLoginSessionReply } from './FreeboxSession.js';
 
-import { setTimeout as sleep } from 'timers/promises';
+// import { setTimeout as sleep } from 'timers/promises';
 
 export interface StoredCredentials {
   trackId: number | null;
@@ -14,7 +14,7 @@ export enum RetryPolicy {
   AUTO_RETRY,
 }
 
-interface RequestQueueItem {
+export interface RequestQueueItem {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
   body: unknown;
@@ -28,7 +28,7 @@ export class DataNotUpdatedError extends Error {
 
 export class FreeboxRequest {
   private RETRY_TIMEOUT = 2000; // 2 seconds
-  private RETRY_COUNT = 0;
+  // private RETRY_COUNT = 0;
 
   //   private credentials: Credentials = {
   //     challenge: null,
@@ -48,7 +48,7 @@ export class FreeboxRequest {
     // private readonly freeboxAddress:string,
     // private readonly freeboxApiVersion:string,
     // private readonly apiUrl:string,
-    private readonly freeboxSession:FreeboxSession,
+    private readonly freeboxSession: FreeboxSession,
   ) {
     // this.freeboxSession = new FreeboxSession(this.log, this.network, this.apiUrl); // this.freeboxAddress, this.freeboxApiVersion);
 
@@ -58,27 +58,31 @@ export class FreeboxRequest {
       track_id: 0,
       token: '',
     };
-    // this.requestQueue = new Array<FBXRequestType>()
   }
 
-  private debug(s: string) {
-    this.log.debug(`FreeboxRequest -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private debug(s: string, ...parameters: any[]) {
+    this.log.debug(`FreeboxRequest -> ${s}`, parameters);
   }
 
-  private info(s: string) {
-    this.log.info(`FreeboxRequest -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private info(s: string, ...parameters: any[]) {
+    this.log.info(`FreeboxRequest -> ${s}`, parameters);
   }
 
-  private warn(s: string) {
-    this.log.warn(`FreeboxRequest -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private warn(s: string, ...parameters: any[]) {
+    this.log.warn(`FreeboxRequest -> ${s}`, parameters);
   }
 
-  private error(s: string) {
-    this.log.error(`FreeboxRequest -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private error(s: string, ...parameters: any[]) {
+    this.log.error(`FreeboxRequest -> ${s}`, parameters);
   }
 
-  private success(s: string) {
-    this.log.success(`FreeboxRequest -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private success(s: string, ...parameters: any[]) {
+    this.log.success(`FreeboxRequest -> ${s}`, parameters);
   }
 
   async freeboxAuth(
@@ -90,6 +94,26 @@ export class FreeboxRequest {
     const s: FBXSessionCredentials = await this.freeboxSession.fbx(authInfo.app_token, authInfo.track_id);
     this.authCallback(s);
     return s;
+  }
+
+  // async request(method: RequestQueueItem['method'], url: string, body: unknown, autoRetry = true): Promise<FBXRequestResult> {
+  async request(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number = 0,
+  ): Promise<FBXRequestResult> {
+    if (this.requestQueue === null || this.requestQueue.length === 0) {
+      // this.debug('Queue empty, launch request immediately');
+      return this.startRequest(method, url, body, retryPolicy, retry_count);
+    } else {
+      this.debug(`Queue length=${this.requestQueue.length}>0, add to queue`);
+      this.addToQueue(method, url, body, retryPolicy, retry_count);
+      return new Promise((resolve, reject) => {
+        this.processQueue(resolve, reject);
+      });
+    }
   }
 
   private authCallback(sessionChallenge: FBXSessionCredentials) {
@@ -105,7 +129,11 @@ export class FreeboxRequest {
     this.info('Updated credentials');
   }
 
-  private addToQueue(method: RequestQueueItem['method'], url: string, body: unknown, retryPolicy: RetryPolicy,
+  private addToQueue(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
     retry_count: number = 0,
   ): void {
     this.requestQueue.push({
@@ -117,19 +145,165 @@ export class FreeboxRequest {
     });
   }
 
-  // async request(method: RequestQueueItem['method'], url: string, body: unknown, autoRetry = true): Promise<FBXRequestResult> {
-  async request(method: RequestQueueItem['method'], url: string, body: unknown, retryPolicy: RetryPolicy,
-    retry_count: number = 0,
+  private async _treat_reply_failed(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number,
+    response: FBXRequestResult,
+    respBody: FBXLoginSessionReply,
   ): Promise<FBXRequestResult> {
-    if (this.requestQueue === null || this.requestQueue.length === 0) {
-      // this.debug('Queue empty, launch request immediately');
-      return this.startRequest(method, url, body, retryPolicy, retry_count);
+    // server replied but no cigar ..
+    if (retryPolicy === RetryPolicy.AUTO_RETRY) {
+      // retry !
+      if (retry_count < 3) {
+        retry_count += 1;
+        await this.delay(this.RETRY_TIMEOUT);
+        return this.request(method, url, body, retryPolicy, retry_count);
+        // <============= QUIT
+      } else {
+        throw new Error(`Request failed after ${retry_count} retries. ${JSON.stringify(response)}`);
+      }
     } else {
-      this.debug(`Queue length=${this.requestQueue.length}>0, add to queue`);
-      this.addToQueue(method, url, body, retryPolicy, retry_count);
-      return new Promise((resolve, reject) => {
-        this.processQueue(resolve, reject);
+      // go to next request in line
+      this.processNextRequest();
+      // return data as is
+      return { status_code: response.status_code, data: respBody };
+      // <============= QUIT
+    }
+  }
+
+  private async _treat_error_code_retry_later(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number,
+    response: FBXRequestResult,
+    respBody: FBXLoginSessionReply,
+  ): Promise<FBXRequestResult> {
+    this.debug('Server asked to retry later !');
+    if (retryPolicy === RetryPolicy.AUTO_RETRY) {
+      this.debug('Retry!');
+      retry_count += 1;
+      await this.delay(this.RETRY_TIMEOUT);
+      return this.request(method, url, body, retryPolicy, retry_count);
+      // <============= QUIT
+    } else {
+      this.debug('Ignore!');
+      // throw new Error(`Retry later (${respBody.error_code}). ${url} ${method} ${body || 'no body'}\n${JSON.stringify(response)}`);
+      // go to next request in line
+      await this.delay(this.RETRY_TIMEOUT); // wait a bit... maybe overwelmed ?!
+      this.processNextRequest();
+      // return data as is
+      return { status_code: response.status_code, data: respBody };
+      // <============= QUIT
+    }
+  }
+
+  private async _treat_error_code_insufficient_rights(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number,
+    response: FBXRequestResult,
+    respBody: FBXLoginSessionReply,
+  ): Promise<FBXRequestResult> {
+    // NO RIGHTS
+    if (retryPolicy === RetryPolicy.AUTO_RETRY) {
+      this.warn(`Insufficient rights to request home API (${respBody.missing_right}). Trying again...`);
+      retry_count += 1;
+      await this.delay(this.RETRY_TIMEOUT);
+      return this.request(method, url, body, retryPolicy, retry_count);
+      // <============= QUIT
+    } else {
+      throw new Error(`Insufficient rights to request home API (${respBody.missing_right}). ${JSON.stringify(response)}`);
+    }
+  }
+
+  private async _treat_error_code_auth_required(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number,
+    _response: FBXRequestResult, // TODO: unused
+    respBody: FBXLoginSessionReply,
+  ): Promise<FBXRequestResult> {
+    if (this.credentials.challenge !== respBody.result.challenge) {
+      this.info('Fbx authed operation requested without credentialsm received salt & challenge');
+      // this.info(JSON.stringify(response.data));
+      const newSessionToken = await this.freeboxSession.session(this.credentials.token, respBody.result.challenge);
+      if (newSessionToken === null) {
+        if (retryPolicy === RetryPolicy.AUTO_RETRY) {
+          this.warn('Freebox OS returned a null sessionToken. Trying again...');
+          retry_count += 1;
+          await this.delay(this.RETRY_TIMEOUT);
+          return this.request(method, url, body, retryPolicy, retry_count);
+          // <============= QUIT
+        } else {
+          throw new Error('Null sessionToken');
+        }
+      }
+      this.authCallback({
+        token: this.credentials.token,
+        session_token: newSessionToken,
+        track_id: this.credentials.track_id!,
+        challenge: respBody.result.challenge,
       });
+      return this.request(method, url, body, retryPolicy, retry_count);
+      // <============= QUIT
+    } else {
+      throw new Error(`auth_required but credential match ?! ${JSON.stringify(respBody)}`);
+    }
+  }
+
+  private async _treat_error_codes(
+    method: RequestQueueItem['method'],
+    url: string,
+    body: unknown,
+    retryPolicy: RetryPolicy,
+    retry_count: number,
+    response: FBXRequestResult,
+    respBody: FBXLoginSessionReply,
+  ): Promise<FBXRequestResult> {
+    // HANDLE error codes
+    if (respBody.error_code === 'auth_required') {
+      return this._treat_error_code_auth_required(
+        method,
+        url,
+        body,
+        retryPolicy,
+        retry_count,
+        response,
+        respBody,
+      );
+    } else if (respBody.error_code === 'insufficient_rights') {
+      return this._treat_error_code_insufficient_rights(
+        method,
+        url,
+        body,
+        retryPolicy,
+        retry_count,
+        response,
+        respBody,
+      );
+    } else if (respBody.error_code === 'retry_later') {
+      return this._treat_error_code_retry_later(
+        method,
+        url,
+        body,
+        retryPolicy,
+        retry_count,
+        response,
+        respBody,
+      );
+    } else if (respBody.error_code === 'not_updated') {
+      throw new DataNotUpdatedError(`Data not updated yet, try again later ${JSON.stringify(response)}`);
+    } else {
+      throw new Error(`UNHANDLED error code ${respBody.error_code} ... ${JSON.stringify(respBody)}`);
     }
   }
 
@@ -165,105 +339,27 @@ export class FreeboxRequest {
         return { status_code: response.status_code, data: respBody };
         // <============= QUIT
       } else {
-        // server replied but no cigar ..
-        if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-          // retry !
-          if (retry_count < 3) {
-            retry_count += 1;
-            await this.delay(this.RETRY_TIMEOUT);
-            return this.request(method, url, body, retryPolicy, retry_count);
-            // <============= QUIT
-          } else {
-            throw new Error(`Request failed after ${retry_count} retries. ${JSON.stringify(response)}`);
-          }
-        } else {
-          // go to next request in line
-          this.processNextRequest();
-          // return data as is
-          return { status_code: response.status_code, data: respBody };
-          // <============= QUIT
-        }
+        return this._treat_reply_failed(
+          method,
+          url,
+          body,
+          retryPolicy,
+          retry_count,
+          response,
+          respBody,
+        );
       }
     } else {
-      // HANDLE error codes
-      if (respBody.error_code === 'auth_required') {
-        if (this.credentials.challenge !== respBody.result.challenge) {
-          this.info('Fbx authed operation requested without credentials');
-          this.info(JSON.stringify(response.data));
-          const newSessionToken = await this.freeboxSession.session(this.credentials.token, respBody.result.challenge);
-          if (newSessionToken === null) {
-            if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-              this.warn('Freebox OS returned a null sessionToken. Trying again...');
-              retry_count += 1;
-              await this.delay(this.RETRY_TIMEOUT);
-              return this.request(method, url, body, retryPolicy, retry_count);
-              // <============= QUIT
-            } else {
-              throw new Error('Null sessionToken');
-            }
-          }
-          this.authCallback({
-            token: this.credentials.token,
-            session_token: newSessionToken,
-            track_id: this.credentials.track_id!,
-            challenge: respBody.result.challenge,
-          });
-          return this.request(method, url, body, retryPolicy, retry_count);
-          // <============= QUIT
-        } else {
-          throw new Error(`auth_required but credential match ?! ${respBody}`);
-        }
-      } else if (respBody.error_code === 'insufficient_rights') {
-        // NO RIGHTS
-        if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-          this.warn(`Insufficient rights to request home API (${respBody.missing_right}). Trying again...`);
-          retry_count += 1;
-          await this.delay(this.RETRY_TIMEOUT);
-          return this.request(method, url, body, retryPolicy, retry_count);
-          // <============= QUIT
-        } else {
-          throw new Error(`Insufficient rights to request home API (${respBody.missing_right}). ${JSON.stringify(response)}`);
-        }
-      } else if (respBody.error_code === 'retry_later') {
-        this.debug('Server asked to retry later !');
-        if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-          this.debug('Retry!');
-          retry_count += 1;
-          await this.delay(this.RETRY_TIMEOUT);
-          return this.request(method, url, body, retryPolicy, retry_count);
-          // <============= QUIT
-        } else {
-          this.debug('Ignore!');
-          // throw new Error(`Retry later (${respBody.error_code}). ${url} ${method} ${body || 'no body'}\n${JSON.stringify(response)}`);
-          // go to next request in line
-          await this.delay(this.RETRY_TIMEOUT); // wait a bit... maybe overwelmed ?!
-          this.processNextRequest();
-          // return data as is
-          return { status_code: response.status_code, data: respBody };
-          // <============= QUIT
-        }
-      } else if (respBody.error_code === 'not_updated') {
-        throw new DataNotUpdatedError(`Data not updated yet, try again later ${JSON.stringify(response)}`);
-      } else {
-        throw new Error(`UNHANDLED error code ${respBody.error_code} ... ${JSON.stringify(respBody)}`);
-      }
+      return this._treat_error_codes(method,
+        url,
+        body,
+        retryPolicy,
+        retry_count,
+        response,
+        respBody,
+      );
     }
-    // } else if (respBody.success === false) {
-    //   if (retry_count < 3) {
-    //     retry_count+=1;
-    //     await this.delay(this.RETRY_TIMEOUT);
-    //     return this.request(method, url, body, retryPolicy, retry_count);
-    //   } else {
-    //     this.RETRY_COUNT = 0;
-    //     throw new Error(`Request failed after retries. ${JSON.stringify(response)}`);
-    //   }
-    // }
-    // } else {
-    //   this.processNextRequest();
-    //   return { status_code: response.status_code, data: respBody };
-    // }
   }
-
 
   private async processQueue(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -272,7 +368,9 @@ export class FreeboxRequest {
     reject: (reason?: any) => void,
   ): Promise<void> {
     while (this.requestQueue.length > 0) {
-      await sleep(250, '');
+      // try space out requests from one another, since we got "socket hang up" or HTTP errors 504
+      await this.delay(750);
+      //
       const next = this.requestQueue.shift();
       if (next) {
         try {
@@ -290,7 +388,7 @@ export class FreeboxRequest {
       const next = this.requestQueue[0];
       setTimeout(() => {
         this.startRequest(next.method, next.url, next.body, next.retry_policy);
-      }, 500);
+      }, 750);
     }
   }
 

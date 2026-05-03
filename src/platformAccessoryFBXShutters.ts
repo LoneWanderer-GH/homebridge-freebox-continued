@@ -203,20 +203,20 @@ export class FBXShutters {
   }
 
   async getCurrentPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn('Triggered GET CurrentPosition');
+    // this.warn('Triggered GET CurrentPosition');
     //callback(null, this.currentPosition);
     return this.currentPosition;
   }
 
   async getPositionState(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn('Triggered GET PositionState');
+    // this.warn('Triggered GET PositionState');
     const trend = this.updateTrends();
-    this.warn(`PositionState -> ${trend}`);
+    // this.warn(`PositionState -> ${trend}`);
     return trend;
   }
 
   async getTargetPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    this.warn('Triggered GET TargetPosition');
+    // this.warn('Triggered GET TargetPosition');
     return this.currentTargetPosition;
   }
 

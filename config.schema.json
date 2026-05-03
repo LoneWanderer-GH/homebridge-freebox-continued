@@ -41,11 +41,11 @@
         "default": 30000
       },
       "useHTTPS": {
-        "title": "try to use HTTPS ? UNSTABLE !",
+        "title": "Use HTTPS with specified domain name to access Freebox API",
         "description": "use at your own risk ...",
         "type": "boolean",
         "required": false,
-        "default": false
+        "default": true
       }
     }
   }

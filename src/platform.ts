@@ -6,7 +6,7 @@ import { FBXShutters } from './platformAccessoryFBXShutters.js';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings.js';
 import { FreeboxRequest } from './freeboxOS/FreeboxRequest.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession } from './freeboxOS/FreeboxSession.js';
-import { AlarmController } from './controllers/AlarmController.js';
+import { AlarmController, AlarmInstance } from './controllers/AlarmController.js';
 import { NodesController } from './controllers/NodesController.js';
 import { FBXBlind, ShuttersController } from './controllers/ShuttersController.js';
 import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
@@ -16,6 +16,8 @@ import { FBXAlarm } from './platformAccessoryFBXAlarm.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import { setTimeout as sleep } from 'timers/promises';
+import { CameraController, FBXCameraInstance } from './controllers/CameraController.js';
+import { FBXCamera } from './platformAccessoryFBXCamera.js';
 
 /**
  * FreeboxPlatform
@@ -42,6 +44,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
   // private fbxSession : FreeboxSession | null;
   private alarmController: AlarmController | null = null;
   private shuttersController: ShuttersController | null = null;
+  private cameraController : CameraController | null = null;
 
   constructor(
     public readonly log: Logging,
@@ -95,15 +98,16 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
           this.log,
           fbxRequest,
           actualApiUrl,
-          // freeboxIPAddress,
-          // freeboxApiVersion,
         );
         this.shuttersController = new ShuttersController(
           this.log,
           fbxRequest,
           actualApiUrl,
-          // freeboxIPAddress,
-          // freeboxApiVersion,
+        );
+        this.cameraController = new CameraController(
+          this.log,
+          fbxRequest,
+          actualApiUrl,
         );
         // run the method to discover / register your devices as accessories
         await this.discoverDevices(nodesCtrl);
@@ -165,6 +169,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     const nodes: Array<FBXHomeNode> = await nodesCtrl.getNodes();
     await this.discoverShutters(nodes);
     await this.discoverAlarms(nodes);
+    await this.discoverCameras(nodes);
   }
 
   private async discoverShutters(nodes: Array<FBXHomeNode>) {
@@ -222,7 +227,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
-      await sleep(800, '');
+      await sleep(1000, '');
     }
   }
 
@@ -230,50 +235,101 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     if (this.alarmController === null) {
       throw new Error('Can\'t discover devices - Freebox Alarm Controller not instanciated');
     }
-    const alarmNode: FBXHomeNode | null = this.alarmController.getAlarm(nodes);
+    const alarms: Array<AlarmInstance> = this.alarmController.getAlarms(nodes);
 
-    if (alarmNode !== null) {
-      const uuid = this.api.hap.uuid.generate(alarmNode.id + alarmNode.name);
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-      if (existingAccessory) {
-        // the accessory already exists
-        this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
+    if (alarms.length > 0) {
+      for (const alarmInstance of alarms) {
+        const uuid = this.api.hap.uuid.generate(alarmInstance.alarmNode.id + alarmInstance.alarmNode.name);
+        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+        if (existingAccessory) {
+          // the accessory already exists
+          this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
 
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
-        existingAccessory.context.device = alarmNode;
-        this.api.updatePlatformAccessories([existingAccessory]);
+          // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
+          existingAccessory.context.device = alarmInstance;
+          this.api.updatePlatformAccessories([existingAccessory]);
 
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new FBXAlarm(this,
-          existingAccessory,
-          this.alarmController);
+          // create the accessory handler for the restored accessory
+          // this is imported from `platformAccessory.ts`
+          new FBXAlarm(this,
+            existingAccessory,
+            this.alarmController);
 
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
-        // remove platform accessories when no longer present
-        // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', alarmNode.name + alarmNode.label);
+          // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
+          // remove platform accessories when no longer present
+          // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+          // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new accessory:', alarmInstance.alarmNode.name + alarmInstance.alarmNode.label);
 
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(alarmNode.label, uuid);
+          // create a new accessory
+          const accessory = new this.api.platformAccessory(alarmInstance.alarmNode.label, uuid);
 
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = alarmNode;
+          // store a copy of the device object in the `accessory.context`
+          // the `context` property can be used to store any data about the accessory you may need
+          accessory.context.device = alarmInstance;
 
-        // create the accessory handler for the newly created accessory
-        // this is imported from `platformAccessory.ts`
-        new FBXAlarm(this,
-          accessory,
-          this.alarmController);
+          // create the accessory handler for the newly created accessory
+          // this is imported from `platformAccessory.ts`
+          new FBXAlarm(this,
+            accessory,
+            this.alarmController);
 
-        // link the accessory to your platform
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          // link the accessory to your platform
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
       }
     }
+  }
 
+  private async discoverCameras(nodes: Array<FBXHomeNode>){
+    if (this.cameraController === null) {
+      throw new Error('Can\'t discover devices - Freebox Camera Controller not instanciated');
+    }
+    const cameras: Array<FBXCameraInstance> = this.cameraController.getCameras(nodes);
+    if (cameras.length > 0) {
+      for (const cameraInstance of cameras) {
+        const uuid = this.api.hap.uuid.generate(cameraInstance.id + cameraInstance.node_data.name);
+        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+        if (existingAccessory) {
+          // the accessory already exists
+          this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
+          
+          // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
+          existingAccessory.context.device = cameraInstance;
+          this.api.updatePlatformAccessories([existingAccessory]);
+
+          // create the accessory handler for the restored accessory
+          new FBXCamera(this,
+            existingAccessory,
+            this.cameraController);
+
+          // // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
+          // // remove platform accessories when no longer present
+          // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+          // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new accessory:', cameraInstance.node_data.name + cameraInstance.node_data.label);
+
+          // create a new accessory
+          const accessory = new this.api.platformAccessory(cameraInstance.node_data.label, uuid, this.api.hap.Categories.IP_CAMERA);
+
+          // store a copy of the device object in the `accessory.context`
+          // the `context` property can be used to store any data about the accessory you may need
+          accessory.context.device = cameraInstance;
+
+          // create the accessory handler for the newly created accessory
+          // this is imported from `platformAccessory.ts`
+          new FBXCamera(this,
+            accessory,
+            this.cameraController);
+
+          // link the accessory to your platform
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      }
+    }
   }
 }

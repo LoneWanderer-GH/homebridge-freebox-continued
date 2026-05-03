@@ -110,6 +110,14 @@ export enum FBXHomeNodeCategory {
     motion_sensor = 'pir',
     contact_sensor = 'dws',
 }
+
+export interface FBXCameraProps {
+    Ip: string;
+    Login: string;
+    Mac: string;
+    Pass: string;
+    Strteam: string;
+}
 export interface FBXHomeNode {
     // Id of the HomeAdapter this node is connected to.
     adapter: number;
@@ -140,6 +148,9 @@ export interface FBXHomeNode {
 
     //Node type info
     type: FBXHomeNodeType;
+
+    // camera specific
+    props?: FBXCameraProps;
 
 }
 export interface FBXNodesResult {

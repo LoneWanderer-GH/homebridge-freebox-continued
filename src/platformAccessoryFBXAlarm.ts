@@ -1,7 +1,12 @@
 import { CharacteristicSetCallback, CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 
-import { AlarmController, AlarmKind as FBXAlarmKind, AlarmState as FBXAlarmState, AlarmInfo as FBXAlarmInfo } from './controllers/AlarmController.js';
-import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
+import {
+  AlarmController, AlarmKind as FBXAlarmKind,
+  AlarmState as FBXAlarmState,
+  AlarmInfo as FBXAlarmInfo,
+  AlarmInstance as FBXAlarmInstance,
+} from './controllers/AlarmController.js';
+// import { FBXHomeNode } from './FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxPlatform } from './platform.js';
 
 // import { setImmediate, setTimeout as sleep } from 'timers/promises';
@@ -16,6 +21,8 @@ export class FBXAlarm {
   private currentState: CharacteristicValue;
   private currentTargetState: CharacteristicValue;
   private alarmRefreshRateMilliSeconds: number;
+
+  private alarmInstance: FBXAlarmInstance;
 
   private currentTargetStateF2H: { [key in FBXAlarmKind]: CharacteristicValue };
   private currentStateF2H: { [key in FBXAlarmState]: CharacteristicValue };
@@ -54,16 +61,14 @@ export class FBXAlarm {
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
       .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
-
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
-    // you can create multiple services for each accessory
+      
     this.service = this.accessory.getService(this.platform.Service.SecuritySystem)
       || this.accessory.addService(this.platform.Service.SecuritySystem);
 
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
-    const devicedata = accessory.context.device as FBXHomeNode;
-    this.service.setCharacteristic(this.platform.Characteristic.Name, devicedata.label);
+    this.alarmInstance = accessory.context.device as FBXAlarmInstance;
+    this.service.setCharacteristic(this.platform.Characteristic.Name, this.alarmInstance.alarmNode.label);
 
     // https://developers.homebridge.io/#/service/SecuritySystem
     // this.service.getCharacteristic(this.platform.Characteristic.SecuritySystemAlarmType)
@@ -130,30 +135,35 @@ export class FBXAlarm {
     //   }
     // }, this.alarmRefreshRateMilliSeconds);
     setInterval(async () => {
-      const alarmInfo: FBXAlarmInfo = await this.alarmController.getAlarmKindAndState();
+      const alarmInfo: FBXAlarmInfo = await this.alarmController.getAlarmKindAndState(this.alarmInstance);
       this.currentTargetState = this.currentTargetStateF2H[alarmInfo.kind];
       this.currentState = this.currentStateF2H[alarmInfo.state];
     }, this.alarmRefreshRateMilliSeconds);
   }
 
-  private debug(s: string) {
-    this.platform.log.debug(`FBXAlarm -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private debug(s: string, ...parameters: any[]): void {
+    this.platform.log.debug(`FBXAlarm -> ${s}`, parameters);
   }
 
-  private info(s: string) {
-    this.platform.log.info(`FBXAlarm -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private info(s: string, ...parameters: any[]): void {
+    this.platform.log.info(`FBXAlarm -> ${s}`, parameters);
   }
 
-  private warn(s: string) {
-    this.platform.log.warn(`FBXAlarm -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private warn(s: string, ...parameters: any[]): void {
+    this.platform.log.warn(`FBXAlarm -> ${s}`, parameters);
   }
 
-  private error(s: string) {
-    this.platform.log.error(`FBXAlarm -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private error(s: string, ...parameters: any[]): void {
+    this.platform.log.error(`FBXAlarm -> ${s}`, parameters);
   }
 
-  private success(s: string) {
-    this.platform.log.success(`FBXAlarm -> ${s}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private success(s: string, ...parameters: any[]): void {
+    this.platform.log.success(`FBXAlarm -> ${s}`, parameters);
   }
 
   /**
@@ -168,43 +178,43 @@ export class FBXAlarm {
    * Handle requests to get the current value of the "Security System Target State" characteristic
    */
   async setSecuritySystemTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-
     this.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
+    let status: boolean = false;
     switch (value) {
       case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
-        {
-          this.debug('DISARM');
-          const status = await this.alarmController.setAlarmDisabled();
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.error('Asked DISARM, but it failed ?!');
-          }
-          break;
+        // {
+        this.debug('DISARM');
+        status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.error('Asked DISARM, but it failed ?!');
         }
+        break;
+      // }
       case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
-        {
-          this.debug('AWAY_ARM');
-          const status = await this.alarmController.setMainAlarm();
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.error('Asked AWAY_ARM, but it failed ?!');
-          }
-          break;
+        // {
+        this.debug('AWAY_ARM');
+        status = await this.alarmController.setMainAlarm(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.error('Asked AWAY_ARM, but it failed ?!');
         }
+        break;
+      // }
       case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
       case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
-        {
-          this.debug('STAY_ARM OR NIGHT_ARM');
-          const status = await this.alarmController.setNightAlarm();
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
-          }
-          break;
+        // {
+        this.debug('STAY_ARM OR NIGHT_ARM');
+        status = await this.alarmController.setNightAlarm(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
         }
+        break;
+      // }
       default:
         throw new Error('WTF BBQ');
     }
