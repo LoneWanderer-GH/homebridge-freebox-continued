@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 
 import * as fs from 'fs';
 import https from 'https';
@@ -11,6 +12,8 @@ export interface FBXRequestResult {
 }
 
 export class Network {
+  private readonly logger: PluginLogger;
+
   private httpsAgent: https.Agent | null = null;
   private ca: Buffer | null = null;
 
@@ -18,6 +21,8 @@ export class Network {
     public readonly log: Logging,
     private readonly useHTTPS: boolean,
   ) {
+    this.logger = new PluginLogger(this.log, 'Network');
+
     if (useHTTPS) {
       this.ca = fs.readFileSync('FBXCerts.crt');
       this.httpsAgent = new https.Agent({
@@ -25,30 +30,11 @@ export class Network {
         keepAlive: true,
       });
       // // this.httpsAgent.on('keylog', (line, _tlsSocket) => {
-      // //   this.debug(`SSL KEYS event: ${line}`);
+      // //   this.logger.debug(`SSL KEYS event: ${line}`);
       // // });
     }
   }
 
-  private debug(s: string) {
-    this.log.debug(`Network -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`Network -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`Network -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`Network -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`Network -> ${s}`);
-  }
 
   // setHTTPSinfo(
   //   host: string,
@@ -72,6 +58,7 @@ export class Network {
   * @param url a string representing the url to reach
   * @param headers special headers if needed
   * @param body request body
+  * @param timeout timeout in milliseconds (default 30000)
   * @returns a FBXRequestResult
    */
   async request(
@@ -82,30 +69,35 @@ export class Network {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     body: any = null,
     bypassHTTPS: boolean = false,
+    timeout: number = 30000,
   ): Promise<FBXRequestResult> {
     // const debug_str_prefix = `${method} ${url}`;
     headers['Content-Type'] = 'application/json; charset=utf-8';
     headers['User-Agent'] = 'Chrome/59.0.3071.115';
+    const controller = new AbortController();
+    const timeoutController = setTimeout(() => controller.abort(), timeout);
     const request: Request = {
       method: method,
       headers: headers,
+      signal: controller.signal,
     };
     if (!bypassHTTPS && this.useHTTPS && this.httpsAgent !== null) {
       request.agent = this.httpsAgent;
     }
     if (body !== null) {
       request.body = JSON.stringify(body);
-      // this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
+      // this.logger.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
     } else {
-      // this.debug(`${debug_str_prefix}`);
+      // this.logger.debug(`${debug_str_prefix}`);
     }
     const response: Response = await fetch(url, request);
+    clearTimeout(timeoutController);
     // if (!response.ok) {
     //   await this.handleHTTPErrorCodes(response, url, method, body);
     //   return { status_code: response.status, data: { error_code: 'retry_later' } };
     // } else {
     const jsonData = await response.json();
-    // this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
+    // this.logger.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
     return { status_code: response.status, data: jsonData };
     // }
   }
@@ -142,9 +134,9 @@ export class Network {
   //   }
   //   if (body !== null) {
   //     request.data = JSON.stringify(body);
-  //     // this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
+  //     // this.logger.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
   //   } else {
-  //     // this.debug(`${debug_str_prefix}`);
+  //     // this.logger.debug(`${debug_str_prefix}`);
   //   }
   //   // try {
   //   request.validateStatus = function (status) {
@@ -155,27 +147,27 @@ export class Network {
   //     await this.handleHTTPErrorCodes(response, url, method, body);
   //     return { status_code: response.status, data: { error_code: 'retry_later' } };
   //   } else {
-  //     // this.debug(JSON.stringify(response.data));
-  //     // this.debug(typeof(response.data));
+  //     // this.logger.debug(JSON.stringify(response.data));
+  //     // this.logger.debug(typeof(response.data));
   //     const jsonData = response.data;
-  //     // this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
+  //     // this.logger.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
   //     return { status_code: response.status, data: jsonData };
   //   }
   //   // } catch (e) {
-  //   //   this.error('Exception=' + JSON.stringify(e));
-  //   //   this.error('while treating request=' + JSON.stringify(request));
+  //   //   this.logger.error('Exception=' + JSON.stringify(e));
+  //   //   this.logger.error('while treating request=' + JSON.stringify(request));
   //   //   return { status_code: -1, data: null };
   //   // }
   // }
 
   // private async handleHTTPErrorCodes(response: Response, url: string, method: string, body: unknown) {
   //   const debug_str_prefix = `${method} ${url}`;
-  //   this.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + ' ' + response.statusText);
+  //   this.logger.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + ' ' + response.statusText);
   //   // node fetch:
   //   const errortext = await response.text();
   //   // axios:
   //   // const errortext = response.data;
-  //   this.error('\n' + errortext);
+  //   this.logger.error('\n' + errortext);
   //   if (response.status === 500) {
   //     this.handleHTTPError500(response, errortext);
   //   } else if (response.status === 501) {
@@ -193,8 +185,8 @@ export class Network {
 
 
   // private handleOtherHTTPErrors(response: Response, errortext: string) {
-  //   this.error(JSON.stringify(response.headers.raw()['content-type']));
-  //   this.error(errortext);
+  //   this.logger.error(JSON.stringify(response.headers.raw()['content-type']));
+  //   this.logger.error(errortext);
   //   throw new Error(`${response.status}. Got a non-JSON  reply!\n\n${errortext}`);
   // }
 
@@ -216,7 +208,7 @@ export class Network {
 
   // private async handleHTTPError504(_response: Response, _errortext: string) {
   //   // throw new Error(`${response.status}. ${response.statusText}`);
-  //   this.warn('Force a delay');
+  //   this.logger.warn('Force a delay');
   //   await this.delay(5000);
   // }
 

@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 import { FBXRequestResult, Network } from '../network/Network.js';
 // import { createHmac } from 'node:crypto';
 import * as crypto from 'crypto';
@@ -72,6 +73,8 @@ export interface FBXSessionCredentials {
   challenge: string | null;
 }
 export class FreeboxSession {
+  private readonly logger: PluginLogger;
+
   // will try every RETRY_TIMEOUT with a delay of RETRY_COUNT
   static readonly RETRY_TIMEOUT = 2000; // 2 seconds
   static readonly RETRY_COUNT = 30;
@@ -87,28 +90,11 @@ export class FreeboxSession {
     // private readonly freeboxApiVersion:string,
     private readonly apiUrl:string,
   ) {
+    this.logger = new PluginLogger(this.log, 'FreeboxSession');
+
 
   }
 
-  private debug(s: string) {
-    this.log.debug(`FreeboxSession -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`FreeboxSession -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`FreeboxSession -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`FreeboxSession -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`FreeboxSession -> ${s}`);
-  }
 
   // Setup the complete auth process.
   // This method is exposed and will be called when the server starts.
@@ -122,24 +108,24 @@ export class FreeboxSession {
           // callback(new_token, sessionToken, new_trackId, challenge);
           return { token: new_token, session_token: sessionToken, track_id: new_trackId, challenge: challenge };
         } else {
-          this.warn('Challenge or session is null');
+          this.logger.warn('Challenge or session is null');
           // callback(null, null, null, null);
           return null_return;
         }
         // });
       } else {
-        this.warn('Token or trackid is null');
+        this.logger.warn('Token or trackid is null');
         // callback(null, null, null, null);
         return null_return;
       }
     } else {
-      this.info('Starting session with existing token');
+      this.logger.info('Starting session with existing token');
       const [challenge, sessionToken] = await this.start(token, trackId); // (challenge: string, sessionToken: string) => {
       if (challenge !== null && sessionToken !== null) {
         // callback(token, sessionToken, trackId, challenge);
         return { token: token, session_token: sessionToken, track_id: trackId, challenge: challenge };
       } else {
-        this.warn('Challenge or session is null, with existing track/token');
+        this.logger.warn('Challenge or session is null, with existing track/token');
         // callback(null, null, null, null);
         return null_return;
       }
@@ -160,11 +146,11 @@ export class FreeboxSession {
     // console.log(JSON.stringify(request_result));
     const body = request_result.data as FBXLoginAuthReply;
     if (body === null) {
-      this.error(`Request ${url} failed. No body received ...`);
+      this.logger.error(`Request ${url} failed. No body received ...`);
       return [null, null];
     }
     if (!body.success) {
-      this.error(`Request ${url} failed. Reply: ${JSON.stringify(body)}`);
+      this.logger.error(`Request ${url} failed. Reply: ${JSON.stringify(body)}`);
       return [null, null];
     }
     const trackId = body.result.track_id;
@@ -182,23 +168,23 @@ export class FreeboxSession {
         return [accessData.challenge, sessionToken];
       } else {
         const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
-        this.warn('Challenge or token is null');
+        this.logger.warn('Challenge or token is null');
         return await this.start(token, trackId);
       }
     } else if (accessData.status === FBXAuthorizationStatus.Canceled
       || accessData.status === FBXAuthorizationStatus.Denied
       || accessData.status === FBXAuthorizationStatus.Timeout) {
-      this.info('Operation canceled after ' + this.accessAttemptCount + ' attempt, access has not been granted');
+      this.logger.info('Operation canceled after ' + this.accessAttemptCount + ' attempt, access has not been granted');
       this.sessionAttemptCount = 0;
       return [null, null];
     } else if (accessData.status === FBXAuthorizationStatus.Pending) {
       const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
       if (this.accessAttemptCount < Number.MAX_SAFE_INTEGER) {
         this.accessAttemptCount++;
-        this.info('Trying again, attempt ' + this.accessAttemptCount);
+        this.logger.info('Trying again, attempt ' + this.accessAttemptCount);
         return await this.start(token, trackId);
       } else {
-        this.info('Operation canceled after ' + this.accessAttemptCount + ' attempt');
+        this.logger.info('Operation canceled after ' + this.accessAttemptCount + ' attempt');
         this.sessionAttemptCount = 0;
         return [null, null];
       }
@@ -214,11 +200,11 @@ export class FreeboxSession {
     const fbxREquestResult = await this.network.request('GET', url, {}); //, (_statusCode: number, body: FBXLoginAuthTrackIdReply) => {
     const body = fbxREquestResult.data as FBXLoginAuthTrackIdReply;
     if (body === null) {
-      this.warn('Unable to check access');
+      this.logger.warn('Unable to check access');
       return { status: FBXAuthorizationStatus.Denied, challenge: null };
     }
     if (body.result === null) {
-      this.warn('Unable to check access');
+      this.logger.warn('Unable to check access');
       return { status: FBXAuthorizationStatus.Denied, challenge: null };
     }
     // const status: FBXAuthorizationStatus = FBXAuthorizationStatus[body.result.status as keyof typeof FBXAuthorizationStatus];
@@ -227,18 +213,18 @@ export class FreeboxSession {
       case FBXAuthorizationStatus.Granted:  // body.result.status == 'granted'
         return { status: status, challenge: body.result.challenge }; // 1 GRANTED
       case FBXAuthorizationStatus.Pending: // body.result.status == 'pending'
-        this.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        this.warn('Pending access, check your Freebox device and manually accept the app request');
-        this.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+        this.logger.warn('Pending access, check your Freebox device and manually accept the app request');
+        this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
         return { status: status, challenge: null }; // 2 PENDING
       case FBXAuthorizationStatus.Denied:
       case FBXAuthorizationStatus.Canceled:
       case FBXAuthorizationStatus.Timeout:
-        this.warn('Access status: ' + status);
+        this.logger.warn('Access status: ' + status);
         return { status: status, challenge: null }; // 0 DENIED
       default:
-        this.error(`Status not recognized ${status}`);
-        this.error(`    Reply was: ${JSON.stringify(body)}`);
+        this.logger.error(`Status not recognized ${status}`);
+        this.logger.error(`    Reply was: ${JSON.stringify(body)}`);
         // return { status: FBXAuthorizationStatus.Denied, challenge: null }; // 0 DENIED
         throw new Error(`Status not recognized ${status} (Reply was: ${JSON.stringify(body)})`);
     }
@@ -248,7 +234,7 @@ export class FreeboxSession {
   // This method is exposed and will be called whenever the session needs to be renewed.
   async session(token: string | null, challenge: string | null): Promise<string | null> {
     if (challenge === null || token === null) {
-      this.info('Operation canceled : token and/or challenge doesn\'t seem good');
+      this.logger.info('Operation canceled : token and/or challenge doesn\'t seem good');
       return null;
     } else {
       // const password = crypto.HmacSHA1(challenge, token).toString();
@@ -267,19 +253,19 @@ export class FreeboxSession {
       const fbxResult: FBXRequestResult = await this.network.request('POST', url, header, data);
       const body = fbxResult.data as FBXLoginSessionReply;
       if (body.success === false) {
-        this.warn('Unable to start session');
+        this.logger.warn('Unable to start session');
         const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
         if (this.sessionAttemptCount < FreeboxSession.RETRY_COUNT) {
           this.sessionAttemptCount++;
-          this.info('Trying again, attempt ' + this.sessionAttemptCount);
+          this.logger.info('Trying again, attempt ' + this.sessionAttemptCount);
           return this.session(token, body.result.challenge);// callback);
         } else {
-          this.info('Operation canceled after ' + this.sessionAttemptCount + ' attempt');
+          this.logger.info('Operation canceled after ' + this.sessionAttemptCount + ' attempt');
           return null;
         }
       } else {
         this.sessionAttemptCount = 0;
-        this.info('Session started');
+        this.logger.info('Session started');
         return body.result.session_token;
       }
     }

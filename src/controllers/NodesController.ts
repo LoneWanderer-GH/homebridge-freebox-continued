@@ -2,9 +2,11 @@ import { Logging } from 'homebridge';
 import { FBXHomeNode, FBXNodesResult } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
+import { PluginLogger } from '../PluginLogger.js';
 
 export class NodesController {
   private freeboxRequest!: FreeboxRequest;
+  private readonly logger: PluginLogger;
 
   constructor(
     public readonly log: Logging,
@@ -12,28 +14,10 @@ export class NodesController {
     private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
-    this.debug('Create Nodes controller');
+    this.logger = new PluginLogger(this.log, 'NodesController');
+    this.logger.debug('Create Nodes controller');
   }
 
-  private debug(s: string) {
-    this.log.debug(`NodesController -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`NodesController -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`NodesController -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`NodesController -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`NodesController -> ${s}`);
-  }
 
   async getNodes(): Promise<Array<FBXHomeNode>> {
     const url = `${this.apiUrl}/home/nodes`;

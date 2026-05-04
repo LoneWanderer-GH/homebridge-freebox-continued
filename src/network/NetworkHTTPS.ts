@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 
 import * as fs from 'fs';
 import https from 'https';
@@ -10,6 +11,8 @@ export interface FBXRequestResult {
 }
 
 export class Network {
+  private readonly logger: PluginLogger;
+
   private httpsAgent: https.Agent;
   private ca: Buffer;
 
@@ -18,6 +21,8 @@ export class Network {
     // private host:string,
     // private port:number,
   ) {
+    this.logger = new PluginLogger(this.log, 'Network');
+
     this.ca = fs.readFileSync('FBXCerts.crt');
     this.httpsAgent = new https.Agent({
       ca: this.ca,
@@ -26,29 +31,10 @@ export class Network {
       // maxSockets: 1,
     });
     // // this.httpsAgent.on('keylog', (line, _tlsSocket) => {
-    // //   this.debug(`SSL KEYS event: ${line}`);
+    // //   this.logger.debug(`SSL KEYS event: ${line}`);
     // // });
   }
 
-  private debug(s: string) {
-    this.log.debug(`Network -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`Network -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`Network -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`Network -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`Network -> ${s}`);
-  }
 
   setHTTPSinfo(
     host: string,
@@ -86,9 +72,9 @@ export class Network {
     };
     if (body !== null) {
       request.body = JSON.stringify(body);
-      // this.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
+      // this.logger.debug(`${debug_str_prefix} -> request:${JSON.stringify(body)}`);
     } else {
-      // this.debug(`${debug_str_prefix}`);
+      // this.logger.debug(`${debug_str_prefix}`);
     }
     const response: NodeFetchResponse = await fetch(url, request);
     if (!response.ok) {
@@ -96,16 +82,16 @@ export class Network {
       return { status_code: response.status, data: { error_code: 'retry_later' } };
     } else {
       const jsonData = await response.json();
-      // this.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
+      // this.logger.debug(`${debug_str_prefix} -> response (json):${JSON.stringify(jsonData)}`);
       return { status_code: response.status, data: jsonData };
     }
   }
 
   private async handleHTTPErrorCodes(response: NodeFetchResponse, url: string, method: string, body: unknown) {
     const debug_str_prefix = `${method} ${url}`;
-    this.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + ' ' + response.statusText);
+    this.logger.error(debug_str_prefix + ' ' + (body || '') + ' => ' + response.status + ' ' + response.statusText);
     const errortext = await response.text();
-    this.error('\n' + errortext);
+    this.logger.error('\n' + errortext);
     if (response.status === 500) {
       this.handleHTTPError500(response, errortext);
     } else if (response.status === 501) {
@@ -122,8 +108,8 @@ export class Network {
   }
 
   private handleOtherHTTPErrors(response: NodeFetchResponse, errortext: string) {
-    this.error(JSON.stringify(response.headers.raw()['content-type']));
-    this.error(errortext);
+    this.logger.error(JSON.stringify(response.headers.raw()['content-type']));
+    this.logger.error(errortext);
     throw new Error(`${response.status}. Got a non-JSON  reply!\n\n${errortext}`);
   }
 
@@ -145,7 +131,7 @@ export class Network {
 
   private async handleHTTPError504(_response: NodeFetchResponse, _errortext: string) {
     // throw new Error(`${response.status}. ${response.statusText}`);
-    this.warn('Force a delay');
+    this.logger.warn('Force a delay');
     await this.delay(5000);
   }
 

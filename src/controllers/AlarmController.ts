@@ -3,6 +3,7 @@ import { Logging } from 'homebridge';
 import { FBXEndPointResult, FBXHomeNode, FBXHomeNodeCategory } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 import { FreeboxRequest, RetryPolicy } from '../freeboxOS/FreeboxRequest.js';
 import { FBXRequestResult } from '../network/Network.js';
+import { PluginLogger } from '../PluginLogger.js';
 
 export enum AlarmKind {
   OFF = 'off',
@@ -42,42 +43,24 @@ export interface AlarmInstance {
 }
 
 export class AlarmController {
+  private readonly logger: PluginLogger;
 
   constructor(
     public readonly log: Logging,
     private freeboxRequest: FreeboxRequest,
     private readonly apiUrl: string,
   ) {
-    this.debug('Create Alarm controller');
-  }
-
-  private debug(s: string) {
-    this.log.debug(`AlarmController -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`AlarmController -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`AlarmController -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`AlarmController -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`AlarmController -> ${s}`);
+    this.logger = new PluginLogger(this.log, 'AlarmController');
+    this.logger.debug('Create Alarm controller');
   }
 
   getAlarms(nodes: Array<FBXHomeNode>): Array<AlarmInstance> {
-    this.debug('getAlarms');
+    this.logger.debug('getAlarms');
     const alarmsList: Array<AlarmInstance> = new Array<AlarmInstance>();
     let stateEndPoint: number = -1;
     for (const node of nodes) {
       if (node.category === FBXHomeNodeCategory.alarm) {
-        this.success(`Found alarm node ! ${node.name} ${node.label}`);
+        this.logger.success(`Found alarm node ! ${node.name} ${node.label}`);
         const kindEndpointsMap: Map<AlarmKind, number> = new Map<AlarmKind, number>();
         for (const ep of node.type.endpoints) {
           if (ep.name !== null) {
@@ -109,12 +92,12 @@ export class AlarmController {
   private async checkAlarmActivable(
     alarm: AlarmInstance,
     target: AlarmKind): Promise<boolean> {
-    this.debug('checkAlarmActivable, kind=' + JSON.stringify(target));
+    this.logger.debug('checkAlarmActivable, kind=' + JSON.stringify(target));
     if (!alarm.isArming) {
       // const state: AlarmState | null = await this.getAlarmState();
       const alarmInfo: AlarmInfo = await this.getAlarmKindAndState(alarm);
       if (alarmInfo.state && alarmInfo.state.includes(target.toString())) { // TODO: better/more explicit code ?
-        this.info(`About to activate [${target}] while state is already [${alarmInfo.state}]`);
+        this.logger.info(`About to activate [${target}] while state is already [${alarmInfo.state}]`);
         return false;
       }
       if (alarmInfo.state !== AlarmState.idle) {
@@ -131,7 +114,7 @@ export class AlarmController {
     alarm: AlarmInstance,
   ): Promise<AlarmInfo> {
     const url = `${this.apiUrl}/home/endpoints/${alarm.alarmNode.id}/${alarm.stateEndPoint}`;
-    // this.debug('getAlarmKindAndState, url=' + url);
+    // this.logger.debug('getAlarmKindAndState, url=' + url);
     // const _payload = {
     //   id: alarm.alarmNode.id,
     //   value: null,
@@ -165,7 +148,7 @@ export class AlarmController {
           alarm.isArming = false;
           break;
         default:
-          this.error(`WTF ?! Received Alarm state ${JSON.stringify(data.result)} => ${alarmState}`);
+          this.logger.error(`WTF ?! Received Alarm state ${JSON.stringify(data.result)} => ${alarmState}`);
       }
       //
     } else {
@@ -179,7 +162,7 @@ export class AlarmController {
   ): Promise<boolean> {
     if (alarm.alarmNode) {
       const url = `${this.apiUrl}/home/endpoints/${alarm.alarmNode.id}/${alarm.kindEndpointsMap.get(AlarmKind.OFF)}`;
-      this.debug('setAlarmDisabled - url=' + url);
+      this.logger.debug('setAlarmDisabled - url=' + url);
       const result: FBXRequestResult = await this.freeboxRequest.request(
         'PUT',
         url,
@@ -202,13 +185,13 @@ export class AlarmController {
   private async setAlarm(
     alarm: AlarmInstance,
     kind: AlarmKind): Promise<boolean> {
-    this.debug('setAlarm');
+    this.logger.debug('setAlarm');
     switch (kind) {
       case AlarmKind.MAIN_ALARM:
       case AlarmKind.NIGHT_ALARM:
         break;
       default:
-        // this.error(`Cant' set alarm for ${kind}`);
+        // this.logger.error(`Cant' set alarm for ${kind}`);
         // return false;
         throw Error('Wrong service called, should use setAlarmDisabled');
     }
@@ -216,7 +199,7 @@ export class AlarmController {
     if (activable && alarm.alarmNode) {
       const ep_id = alarm.kindEndpointsMap.get(kind);
       const url = `${this.apiUrl}/home/endpoints/${alarm.alarmNode.id}/${ep_id}`;
-      this.debug('setAlarm - activable => url=' + url);
+      this.logger.debug('setAlarm - activable => url=' + url);
       // this.storedAlarmTargetKind = kind;
       const result: FBXRequestResult = await this.freeboxRequest.request(
         'PUT',
@@ -231,7 +214,7 @@ export class AlarmController {
         return false;
       }
     } else {
-      this.info(`Alarm ${AlarmKind.MAIN_ALARM} not activable ${activable} or no alarm node found...`);
+      this.logger.info(`Alarm ${AlarmKind.MAIN_ALARM} not activable ${activable} or no alarm node found...`);
       return false;
     }
   }
@@ -239,14 +222,14 @@ export class AlarmController {
   async setMainAlarm(
     alarm: AlarmInstance,
   ): Promise<boolean> {
-    this.debug('setMainAlarm');
+    this.logger.debug('setMainAlarm');
     return await this.setAlarm(alarm, AlarmKind.MAIN_ALARM);
   }
 
   async setNightAlarm(
     alarm: AlarmInstance,
   ): Promise<boolean> {
-    this.debug('setNightAlarm');
+    this.logger.debug('setNightAlarm');
     return await this.setAlarm(alarm, AlarmKind.NIGHT_ALARM);
   }
 }

@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 // import { setTimeout as sleep } from 'timers/promises';
 import {
   FBXEndPointResult,
@@ -43,6 +44,7 @@ export interface BlindPosValue {
 
 export class ShuttersController {
   private freeboxRequest!: FreeboxRequest;
+  private readonly logger: PluginLogger;
 
   // private storedBlinds: Array<FBXBlind> = [];
   constructor(
@@ -53,28 +55,10 @@ export class ShuttersController {
     private readonly apiUrl: string,
   ) {
     this.freeboxRequest = freeboxRequest;
-    this.debug('Create Shutters controller');
+    this.logger = new PluginLogger(this.log, 'ShuttersController');
+    this.logger.debug('Create Shutters controller');
   }
 
-  private debug(s: string) {
-    this.log.debug(`ShuttersController -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`ShuttersController -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`ShuttersController -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`ShuttersController -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`ShuttersController -> ${s}`);
-  }
 
   private isValidShutterPosition(pos: number): boolean {
     return pos >= 0 && pos <= 100;
@@ -85,7 +69,7 @@ export class ShuttersController {
     // const url = `${this.apiUrl}/home/nodes`;
     // const result: FBXRequestResult = await this.freeboxRequest.request('GET', url, null, RetryPolicy.AUTO_RETRY);
     // if (result.status_code !== 200) {
-    //   this.debug(`received error ${result.status_code} to ${url}`);
+    //   this.logger.debug(`received error ${result.status_code} to ${url}`);
     //   return rval;
     // }
     // const data: FBXNodesResult = result.data as FBXNodesResult;
@@ -121,16 +105,16 @@ export class ShuttersController {
             http_method: 'PUT',
           },
         };
-        this.debug('found store/shutter=' + o.nodeid + '->' + o.displayName);
+        this.logger.debug('found store/shutter=' + o.nodeid + '->' + o.displayName);
         // console.log(JSON.stringify(node))
         rval.push(o);
       }
     }
     //   } else {
-    //     this.warn(`Request result said status failed. ${data} for ${url}`);
+    //     this.logger.warn(`Request result said status failed. ${data} for ${url}`);
     //   }
     // } else {
-    //   this.warn(`Request result gave no data for ${url}`);
+    //   this.logger.warn(`Request result gave no data for ${url}`);
     // }
     // this.storedBlinds = rval;
     return rval;
@@ -146,7 +130,7 @@ export class ShuttersController {
         continue;
       }
       if (endpoint.ep_type !== null && endpoint.ep_type === type) {
-        // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+        // this.logger.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
         //     ==> endpoint id=${endpoint.id}`);
         return endpoint.id;
       }
@@ -167,14 +151,14 @@ export class ShuttersController {
   //       continue;
   //     }
   //     if (endpoint.access !== null && endpoint.access! === rw_status) {
-  //       // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //       // this.logger.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
   //       //     ==> endpoint id=${endpoint.id}`);
   //       return endpoint.id;
   //     } else {
-  //       // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
-  //       // this.debug('getEndPointIdWithName -> trying ui data');
+  //       // this.logger.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
+  //       // this.logger.debug('getEndPointIdWithName -> trying ui data');
   //       if (endpoint.ui !== null && endpoint.ui!.access === rw_status) {
-  //         // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //         // this.logger.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
   //         //   ==> endpoint id=${endpoint.id}`);
   //         return endpoint.id;
   //       }
@@ -195,14 +179,14 @@ export class ShuttersController {
   //       continue;
   //     }
   //     if (endpoint.access !== null) {
-  //       // this.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //       // this.logger.debug(`getEndPointIdWithName -> FOUND ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
   //       //     ==> endpoint id=${endpoint.id}`);
   //       return endpoint.id;
   //     } else {
-  //       // this.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
-  //       // this.debug('getEndPointIdWithName -> trying ui data');
+  //       // this.logger.debug(`getEndPointIdWithName -> no access level data defined for ${blind.displayName} endpoint ${name}`);
+  //       // this.logger.debug('getEndPointIdWithName -> trying ui data');
   //       if (endpoint.ui !== null) {
-  //         // this.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
+  //         // this.logger.debug(`getEndPointIdWithName -> FOUND in ui ! for ${blind.displayName} endpoint ${name} with access ${rw_status}
   //         //   ==> endpoint id=${endpoint.id}`);
   //         return endpoint.id;
   //       }
@@ -232,9 +216,9 @@ export class ShuttersController {
     // previousValue: boolean | number | null,
     // ): Promise<{ status: boolean; value: number }> {
   ): Promise<FBXHomeNodeEndpointValue | null> {
-    // this.debug(`${expected_end_point_name} ${access_mode} -> blind index=${blind_index}`);
+    // this.logger.debug(`${expected_end_point_name} ${access_mode} -> blind index=${blind_index}`);
     // const blind = this.getBlindAtIndex(blind_index);
-    // this.debug(`${expected_end_point_name} ${access_mode} -> blind=${blind.displayName} nodeid=${blind.nodeid}`);
+    // this.logger.debug(`${expected_end_point_name} ${access_mode} -> blind=${blind.displayName} nodeid=${blind.nodeid}`);
     const node_id = blind.nodeid;
     // let ep_id: number | null = null;
     // if (access_mode === null) {
@@ -243,13 +227,14 @@ export class ShuttersController {
     //   ep_id = this.getEndPointIdWithNameAndAccess(blind, expected_end_point_name, access_mode);
     // }
     // if (ep_id === null) {
-    //   this.warn(`${expected_end_point_name} -> expected endpoint with name=${expected_end_point_name} ${access_mode} not found...`);
+    //   this.logger.warn(`${expected_end_point_name} -> expected endpoint with name=${expected_end_point_name} ${access_mode}
+    //  not found...`);
     //   throw new Error(`Failed to send ${expected_end_point_name} to blind ${blind.displayName} (nodeid=${node_id}).
     //             No valid endpointid found (expected=${expected_end_point_name})`);
     // }
     const blind_debug_str = `blind ${blind.displayName} (nodeid=${node_id}), endpointid=${cmd.endpoint})`;
     const url = `${this.apiUrl}/home/endpoints/${node_id}/${cmd.endpoint}`;
-    // this.debug(`${blind.displayName} => prepare call ${url}`);
+    // this.logger.debug(`${blind.displayName} => prepare call ${url}`);
     let payload: unknown = null;
     if (cmd.http_method === 'PUT' && value !== null && typeof (value) === 'number') {
       const posValid = this.isValidShutterPosition(value! as number);
@@ -260,32 +245,32 @@ export class ShuttersController {
       // return null;
     }
     // try {
-    // this.debug(`${blind.displayName} => perform call ${url}`);
+    // this.logger.debug(`${blind.displayName} => perform call ${url}`);
     const result: FBXRequestResult = await this.freeboxRequest.request(
       cmd.http_method,
       url,
       payload,
       RetryPolicy.NO_RETRY);
     // RetryPolicy.AUTO_RETRY);
-    // this.debug(`${blind.displayName} => call result = ${JSON.stringify(result)}`);
+    // this.logger.debug(`${blind.displayName} => call result = ${JSON.stringify(result)}`);
     if (result === null) {
       throw new Error(`Failed to send ${url} ${cmd.http_method} ${blind_debug_str}. No HTTP body response`);
     }
     const data: FBXEndPointResult = result.data as FBXEndPointResult;
-    // this.debug(`${blind.displayName} => ${JSON.stringify(data)}`);
+    // this.logger.debug(`${blind.displayName} => ${JSON.stringify(data)}`);
 
     if (data.success === null) {
       // all strings below are for linter
       const msg_info = 'No "success" in reply';
       const msg_additional_data = `statusCode=${result.status_code} body=${JSON.stringify(data)}`;
-      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_info}`);
-      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_additional_data}`);
+      this.logger.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_info}`);
+      this.logger.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> ${msg_additional_data}`);
       // const err_msg_perfix = `${url} ${http_method} ${blind_debug_str}`;
       // const err_msg = `${err_msg_perfix}. ${msg_info}. ${msg_additional_data}`;
       // throw new Error(err_msg);
       return null;
     } else if (data.success === false) {
-      this.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> success was false. No value found`);
+      this.logger.warn(`${url} ${cmd.http_method} -> ${blind_debug_str} -> success was false. No value found`);
       return null;
     } else {
       return data.result;
@@ -298,7 +283,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<BlindPosValue> {
     // const blind = this.getBlindAtIndex(blind_index);
-    // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid);
+    // this.logger.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
       // blind_index,
       blind,
@@ -313,7 +298,7 @@ export class ShuttersController {
         if (rval.value_type === 'int') {
           const v: number = parseInt(rval.value);
           blind.current_target_position = v;
-          // this.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
+          // this.logger.debug('getBlindTargetPosition ' + blind.displayName + '@' + blind.nodeid + ' targetpos=' + v);
         } else {
           throw new EvalError(`Expected int type for result... got ${JSON.stringify(rval)}`);
         }
@@ -321,8 +306,8 @@ export class ShuttersController {
         throw new EvalError(`No value type in reply ? ${JSON.stringify(rval)}`);
       }
       // if (rval.refresh !== null && rval.refresh !== undefined) {
-      //   this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
-      //   this.debug('sleep for ' + rval.refresh + ' ms');
+      //   this.logger.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+      //   this.logger.debug('sleep for ' + rval.refresh + ' ms');
       //   await sleep(rval.refresh, '');
       // }
     }
@@ -334,7 +319,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<BlindPosValue> {
     // const blind = this.getBlindAtIndex(blind_index);
-    // this.debug('getBlindCurrentPosition ' + blind.displayName + '@' + blind.nodeid);
+    // this.logger.debug('getBlindCurrentPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
       // blind_index,
       blind,
@@ -356,8 +341,8 @@ export class ShuttersController {
         throw new EvalError(`Expected int type for result... no value type defined ?! ${JSON.stringify(rval)}`);
       }
       // if (rval.refresh !== null && rval.refresh !== undefined) {
-      //   this.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
-      //   this.debug('sleep for ' + rval.refresh + ' ms');
+      //   this.logger.debug('Freebox returned refresh wait ' + rval.refresh + ' ms');
+      //   this.logger.debug('sleep for ' + rval.refresh + ' ms');
       //   await sleep(rval.refresh, '');
       // }
     }
@@ -369,7 +354,7 @@ export class ShuttersController {
     blind: FBXBlind,
     value: number): Promise<boolean> {
     // const blind = this.getBlindAtIndex(blind_index);
-    // this.debug('setBlindPosition ' + blind.displayName + '@' + blind.nodeid);
+    // this.logger.debug('setBlindPosition ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
       // blind_index,
       blind,
@@ -399,7 +384,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<boolean> {
     // const blind = this.getBlindAtIndex(blind_index);
-    this.debug('stopBlind ' + blind.displayName + '@' + blind.nodeid);
+    this.logger.debug('stopBlind ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
       // blind_index,
       blind,
@@ -426,7 +411,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<boolean> {
     // const blind = this.getBlindAtIndex(blind_index);
-    this.debug('toggleBlind ' + blind.displayName + '@' + blind.nodeid);
+    this.logger.debug('toggleBlind ' + blind.displayName + '@' + blind.nodeid);
     const rval = await this.executeCommand(
       // blind_index,
       blind,
@@ -453,7 +438,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<boolean> {
     // const blind = this.getBlindAtIndex(blind_index);
-    this.debug('openBlind ' + blind.displayName + '@' + blind.nodeid);
+    this.logger.debug('openBlind ' + blind.displayName + '@' + blind.nodeid);
     return this.setBlindPosition(blind, 0);
   }
 
@@ -462,7 +447,7 @@ export class ShuttersController {
     blind: FBXBlind,
   ): Promise<boolean> {
     // const blind = this.getBlindAtIndex(blind_index);
-    this.debug('closeBlind ' + blind.displayName + '@' + blind.nodeid);
+    this.logger.debug('closeBlind ' + blind.displayName + '@' + blind.nodeid);
     return this.setBlindPosition(blind, 100);
   }
 }

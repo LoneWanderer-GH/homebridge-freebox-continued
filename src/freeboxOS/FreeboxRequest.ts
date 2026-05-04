@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 import { FBXRequestResult, Network } from '../network/Network.js';
 import { FBXAuthInfo, FBXSessionCredentials, FreeboxSession, FBXLoginSessionReply } from './FreeboxSession.js';
 
@@ -38,6 +39,7 @@ export class FreeboxRequest {
   //   };
 
   private requestQueue: RequestQueueItem[] = [];
+  private readonly logger: PluginLogger;
 
   // private freeboxSession: FreeboxSession;
   public credentials: FBXSessionCredentials;
@@ -50,6 +52,8 @@ export class FreeboxRequest {
     // private readonly apiUrl:string,
     private readonly freeboxSession: FreeboxSession,
   ) {
+    this.logger = new PluginLogger(this.log, 'DataNotUpdatedError');
+
     // this.freeboxSession = new FreeboxSession(this.log, this.network, this.apiUrl); // this.freeboxAddress, this.freeboxApiVersion);
 
     this.credentials = {
@@ -61,36 +65,13 @@ export class FreeboxRequest {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private debug(s: string, ...parameters: any[]) {
-    this.log.debug(`FreeboxRequest -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private info(s: string, ...parameters: any[]) {
-    this.log.info(`FreeboxRequest -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private warn(s: string, ...parameters: any[]) {
-    this.log.warn(`FreeboxRequest -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private error(s: string, ...parameters: any[]) {
-    this.log.error(`FreeboxRequest -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private success(s: string, ...parameters: any[]) {
-    this.log.success(`FreeboxRequest -> ${s}`, parameters);
-  }
 
   async freeboxAuth(
     authInfo: FBXAuthInfo,
     // token: string,
     // trackId: number
   ): Promise<FBXSessionCredentials> {
-    this.info('Queue length=' + this.requestQueue.length);
+    this.logger.info('Queue length=' + this.requestQueue.length);
     const s: FBXSessionCredentials = await this.freeboxSession.fbx(authInfo.app_token, authInfo.track_id);
     this.authCallback(s);
     return s;
@@ -105,10 +86,10 @@ export class FreeboxRequest {
     retry_count: number = 0,
   ): Promise<FBXRequestResult> {
     if (this.requestQueue === null || this.requestQueue.length === 0) {
-      // this.debug('Queue empty, launch request immediately');
+      // this.logger.debug('Queue empty, launch request immediately');
       return this.startRequest(method, url, body, retryPolicy, retry_count);
     } else {
-      this.debug(`Queue length=${this.requestQueue.length}>0, add to queue`);
+      this.logger.debug(`Queue length=${this.requestQueue.length}>0, add to queue`);
       this.addToQueue(method, url, body, retryPolicy, retry_count);
       return new Promise((resolve, reject) => {
         this.processQueue(resolve, reject);
@@ -119,14 +100,14 @@ export class FreeboxRequest {
   private authCallback(sessionChallenge: FBXSessionCredentials) {
     //token: string | null, sessionToken: string, trackId: number, challenge: string): void {
     if (sessionChallenge.token === null) {
-      this.warn('Trying updating with null credentials');
+      this.logger.warn('Trying updating with null credentials');
       return;
     }
     this.credentials.session_token = sessionChallenge.session_token;
     this.credentials.challenge = sessionChallenge.challenge;
     this.credentials.token = sessionChallenge.token;
     this.credentials.track_id = sessionChallenge.track_id;
-    this.info('Updated credentials');
+    this.logger.info('Updated credentials');
   }
 
   private addToQueue(
@@ -183,15 +164,15 @@ export class FreeboxRequest {
     response: FBXRequestResult,
     respBody: FBXLoginSessionReply,
   ): Promise<FBXRequestResult> {
-    this.debug('Server asked to retry later !');
+    this.logger.debug('Server asked to retry later !');
     if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-      this.debug('Retry!');
+      this.logger.debug('Retry!');
       retry_count += 1;
       await this.delay(this.RETRY_TIMEOUT);
       return this.request(method, url, body, retryPolicy, retry_count);
       // <============= QUIT
     } else {
-      this.debug('Ignore!');
+      this.logger.debug('Ignore!');
       // throw new Error(`Retry later (${respBody.error_code}). ${url} ${method} ${body || 'no body'}\n${JSON.stringify(response)}`);
       // go to next request in line
       await this.delay(this.RETRY_TIMEOUT); // wait a bit... maybe overwelmed ?!
@@ -213,7 +194,7 @@ export class FreeboxRequest {
   ): Promise<FBXRequestResult> {
     // NO RIGHTS
     if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-      this.warn(`Insufficient rights to request home API (${respBody.missing_right}). Trying again...`);
+      this.logger.warn(`Insufficient rights to request home API (${respBody.missing_right}). Trying again...`);
       retry_count += 1;
       await this.delay(this.RETRY_TIMEOUT);
       return this.request(method, url, body, retryPolicy, retry_count);
@@ -233,12 +214,12 @@ export class FreeboxRequest {
     respBody: FBXLoginSessionReply,
   ): Promise<FBXRequestResult> {
     if (this.credentials.challenge !== respBody.result.challenge) {
-      this.info('Fbx authed operation requested without credentialsm received salt & challenge');
-      // this.info(JSON.stringify(response.data));
+      this.logger.info('Fbx authed operation requested without credentialsm received salt & challenge');
+      // this.logger.info(JSON.stringify(response.data));
       const newSessionToken = await this.freeboxSession.session(this.credentials.token, respBody.result.challenge);
       if (newSessionToken === null) {
         if (retryPolicy === RetryPolicy.AUTO_RETRY) {
-          this.warn('Freebox OS returned a null sessionToken. Trying again...');
+          this.logger.warn('Freebox OS returned a null sessionToken. Trying again...');
           retry_count += 1;
           await this.delay(this.RETRY_TIMEOUT);
           return this.request(method, url, body, retryPolicy, retry_count);
@@ -314,12 +295,12 @@ export class FreeboxRequest {
     retryPolicy: RetryPolicy,
     retry_count: number = 0,
   ): Promise<FBXRequestResult> {
-    // this.debug('startRequest Queue !');
+    // this.logger.debug('startRequest Queue !');
     if (this.credentials.token === null) {
-      this.warn('Operation requested with null token');
+      this.logger.warn('Operation requested with null token');
       throw new Error('Null token');
     }
-    // this.debug(`Launch request ${method} @ ${url} with credentials`);
+    // this.logger.debug(`Launch request ${method} @ ${url} with credentials`);
     const response: FBXRequestResult = await this.network.request(
       method,
       url,
@@ -327,10 +308,12 @@ export class FreeboxRequest {
         'X-Fbx-App-Auth': this.credentials.session_token || '',
       },
       body,
+      false,
+      30000, // 30 second timeout
     );
-    // this.debug(`Got reply to ${method} @ ${url} = ${JSON.stringify(response)}`);
+    // this.logger.debug(`Got reply to ${method} @ ${url} = ${JSON.stringify(response)}`);
     const respBody: FBXLoginSessionReply = response.data as FBXLoginSessionReply;
-    // this.debug('Parsing reply');
+    // this.logger.debug('Parsing reply');
     if (respBody.error_code === undefined || respBody.error_code === null) {
       // server gracefully replied
       if (respBody.success === true) {

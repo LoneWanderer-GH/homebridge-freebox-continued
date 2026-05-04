@@ -2,8 +2,8 @@
   "private": true,
   "displayName": "Freebox Home Api",
   "name": "homebridge-freebox-continued",
-  "version": "0.0.1",
-  "description": "Porting of the legacy Freebox Homebridge https://github.com/fbx/homebridge-freebox-home. Supports window covering/slats/shutters.",
+  "version": "0.0.2",
+  "description": "Porting of the legacy Freebox Homebridge https://github.com/fbx/homebridge-freebox-home. Supports alarm, motion detector, door sensor. Window covering/slats/shutters is yet to be confirmed ...",
   "license": "MIT",
   "type": "module",
   "repository": {
@@ -22,7 +22,8 @@
     "lint": "eslint src/**/*.ts --max-warnings=0",
     "lintLocal": "eslint src/**/*.ts --max-warnings=0 --fix",
     "watch": "npm run build && npm link && nodemon",
-    "localPublish": "cp -r . /volume1/docker/homebridge/node_modules/homebridge-freebox-continued/",
+    "localPublish_old": "cp -r . /volume1/docker/homebridge/node_modules/homebridge-freebox-continued/",
+    "localPublish": "cp -r . /homebridge/node_modules/homebridge-freebox-continued/",
     "build": "rimraf ./dist && tsc",
     "buildPublishLocal": "npm run build && npm run lintLocal && npm run localPublish",
     "prepublishOnly": "npm run lint && npm run build"

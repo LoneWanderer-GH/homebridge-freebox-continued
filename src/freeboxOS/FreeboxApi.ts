@@ -1,4 +1,5 @@
 import { Logging } from 'homebridge';
+import { PluginLogger } from '../PluginLogger.js';
 // import { setTimeout as sleep } from 'timers/promises';
 // import { FBXEndPointResult, FBXHomeNode, FBXHomeNodeCategory, FBXNodesResult } from '../FreeboxHomeTypes/FBXHomeTypes.js';
 // import { FreeboxRequest, RetryPolicy } from './FreeboxRequest.js';
@@ -26,6 +27,8 @@ export interface FBXAPI {
 
 
 export class FreeboxController {
+  private readonly logger: PluginLogger;
+
 
   // private freeboxRequest!: FreeboxRequest;
   private apiInfoUrl: string;
@@ -37,29 +40,12 @@ export class FreeboxController {
     public readonly network: Network,
     private readonly freeboxAddress: string,
   ) {
+    this.logger = new PluginLogger(this.log, 'FreeboxController');
+
     // this.freeboxRequest = freeboxRequest;
     this.apiInfoUrl = `http://${this.freeboxAddress}/api_version`;
   }
 
-  private debug(s: string) {
-    this.log.debug(`FreeboxController -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.log.info(`FreeboxController -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.log.warn(`FreeboxController -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.log.error(`FreeboxController -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.log.success(`FreeboxController -> ${s}`);
-  }
 
   getApiInfo(): FBXApiVersion {
     if (this.apiInfo === null) {
@@ -69,15 +55,17 @@ export class FreeboxController {
   }
 
   async getActualApiUrl(): Promise<FBXAPI> {
-    this.info('Discovering Freebox API configuration');
+    this.logger.info('Discovering Freebox API configuration');
     const apiVersionData: FBXRequestResult = await this.network.request(
       'GET',
       this.apiInfoUrl,
       {},
       null,
-      true);
+      true,
+      10000, // 10 second timeout for API discovery
+    );
     if (apiVersionData.status_code === 200) {
-      this.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
+      this.logger.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
       this.apiInfo = apiVersionData.data as FBXApiVersion;
       const majorVersion = this.apiInfo.api_version.split('.')[0];
       return {
@@ -87,8 +75,8 @@ export class FreeboxController {
         webSocketurl: `wss://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}/ws`,
       };
     } else {
-      this.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
-      this.warn(JSON.stringify(apiVersionData));
+      this.logger.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
+      this.logger.warn(JSON.stringify(apiVersionData));
       const _finished = await sleep(this.apiInfoRetryDelayMs, '');
       return await this.getActualApiUrl();
     }

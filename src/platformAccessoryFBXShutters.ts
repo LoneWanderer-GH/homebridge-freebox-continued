@@ -6,6 +6,7 @@ import {
   PlatformAccessory,
   Service,
 } from 'homebridge';
+import { PluginLogger } from './PluginLogger.js';
 
 import { setImmediate, setTimeout as sleep } from 'timers/promises';
 
@@ -19,6 +20,8 @@ import { BlindPosValue, FBXBlind, ShuttersController } from './controllers/Shutt
  * Each accessory may expose multiple services of different service types.
  */
 export class FBXShutters {
+  private readonly logger: PluginLogger;
+
   private service: Service;
   private shutterDevice: FBXBlind;
   private currentPosition: number;
@@ -33,6 +36,8 @@ export class FBXShutters {
     private readonly accessory: PlatformAccessory,
     private readonly shuttersController: ShuttersController,
   ) {
+    this.logger = new PluginLogger(this.platform.log, 'FBXShutters');
+
     this.shutterDevice = accessory.context.device as FBXBlind;
     this.shuttersRefreshRateMilliSeconds = this.platform.config.shuttersRefreshRateMilliSeconds;
     this.platform.log.info('Create shutter ' + this.shutterDevice.displayName + ' ' + this.shutterDevice.nodeid);
@@ -113,7 +118,7 @@ export class FBXShutters {
       await this.updateCurrentPosition(false);
       const gotCurrentTargetPos = await this.updateCurrentTargetPosition(false);
       if (!gotCurrentTargetPos) {
-        this.warn('Could not find a initial target position');
+        this.logger.warn('Could not find a initial target position');
       }
     });
 
@@ -143,25 +148,6 @@ export class FBXShutters {
     }, this.shuttersRefreshRateMilliSeconds + 500);
   }
 
-  private debug(s: string) {
-    this.platform.log.debug(`FBXShutters ${this.debugName} -> ${s}`);
-  }
-
-  private info(s: string) {
-    this.platform.log.info(`FBXShutters ${this.debugName} -> ${s}`);
-  }
-
-  private warn(s: string) {
-    this.platform.log.warn(`FBXShutters ${this.debugName} -> ${s}`);
-  }
-
-  private error(s: string) {
-    this.platform.log.error(`FBXShutters ${this.debugName} -> ${s}`);
-  }
-
-  private success(s: string) {
-    this.platform.log.success(`FBXShutters ${this.debugName} -> ${s}`);
-  }
 
   private async updateCurrentPosition(doPublish: boolean = true) {
     const funcname = 'updateCurrentPosition';
@@ -203,25 +189,25 @@ export class FBXShutters {
   }
 
   async getCurrentPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    // this.warn('Triggered GET CurrentPosition');
+    // this.logger.warn('Triggered GET CurrentPosition');
     //callback(null, this.currentPosition);
     return this.currentPosition;
   }
 
   async getPositionState(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    // this.warn('Triggered GET PositionState');
+    // this.logger.warn('Triggered GET PositionState');
     const trend = this.updateTrends();
-    // this.warn(`PositionState -> ${trend}`);
+    // this.logger.warn(`PositionState -> ${trend}`);
     return trend;
   }
 
   async getTargetPosition(/*callback: CharacteristicGetCallback*/): Promise<CharacteristicValue> {
-    // this.warn('Triggered GET TargetPosition');
+    // this.logger.warn('Triggered GET TargetPosition');
     return this.currentTargetPosition;
   }
 
   async setTargetPosition(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-    this.warn(`Triggered SET TargetPosition: ${value}`);
+    this.logger.warn(`Triggered SET TargetPosition: ${value}`);
     const posVal: number = value as number;
     // apple convention  : 100 = OPEN / 0 = CLOSED
     // Freebox convention: 100 = CLOSED / 0 = OPEN
@@ -233,20 +219,20 @@ export class FBXShutters {
       this.previousTargetPosition = this.currentTargetPosition;
       this.currentTargetPosition = posVal;
     } else {
-      this.debug(`Triggered SET TargetPosition: ${value} FAILED. KEPT LAST VALUE`);
+      this.logger.debug(`Triggered SET TargetPosition: ${value} FAILED. KEPT LAST VALUE`);
       callback(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
     }
     // }
   }
 
   // async setHoldPosition(value: CharacteristicValue/*callback: CharacteristicSetCallback*/) {
-  //   this.warn(`Triggered SET HoldPosition ${value}`);
+  //   this.logger.warn(`Triggered SET HoldPosition ${value}`);
   //   const status: boolean = await this.shuttersController.stopBlind(this.controllerShutterIndex);
   //   if (status) {
-  //     this.debug(`Triggered SET HoldPosition success`);
+  //     this.logger.debug(`Triggered SET HoldPosition success`);
   //     // callback(null);
   //   } else {
-  //     this.debug(`Triggered SET HoldPosition FAILED ...`);
+  //     this.logger.debug(`Triggered SET HoldPosition FAILED ...`);
   //     // callback(HAPStatus.NOT_ALLOWED_IN_CURRENT_STATE);
   //   }
   // }
@@ -254,13 +240,13 @@ export class FBXShutters {
   private updateTrends(): CharacteristicValue {
     // apple convention  : 100 = OPEN / 0 = CLOSED
     if (this.currentPosition > this.previousPosition) {
-      // this.debug(`PositionState -> INCREASING`);
+      // this.logger.debug(`PositionState -> INCREASING`);
       return this.platform.Characteristic.PositionState.INCREASING;
     } else if (this.currentPosition < this.previousPosition) {
-      // this.debug(`PositionState -> DECREASING`);
+      // this.logger.debug(`PositionState -> DECREASING`);
       return this.platform.Characteristic.PositionState.DECREASING;
     } else {
-      // this.debug(`PositionState -> STOPPED`);
+      // this.logger.debug(`PositionState -> STOPPED`);
       // this.currentTargetPosition = this.currentPosition;
 
       // necessary ?

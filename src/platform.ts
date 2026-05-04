@@ -18,6 +18,8 @@ import * as path from 'path';
 import { setTimeout as sleep } from 'timers/promises';
 import { CameraController, FBXCameraInstance } from './controllers/CameraController.js';
 import { FBXCamera } from './platformAccessoryFBXCamera.js';
+import { SensorsController, SensorInstance } from './controllers/SensorsController.js';
+import { FBXSecuritySensors } from './platformAccessoryFBXSecuritySensors.js';
 
 /**
  * FreeboxPlatform
@@ -45,6 +47,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
   private alarmController: AlarmController | null = null;
   private shuttersController: ShuttersController | null = null;
   private cameraController : CameraController | null = null;
+  private sensorsController: SensorsController | null = null;
 
   constructor(
     public readonly log: Logging,
@@ -105,6 +108,11 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
           actualApiUrl,
         );
         this.cameraController = new CameraController(
+          this.log,
+          fbxRequest,
+          actualApiUrl,
+        );
+        this.sensorsController = new SensorsController(
           this.log,
           fbxRequest,
           actualApiUrl,
@@ -170,6 +178,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     await this.discoverShutters(nodes);
     await this.discoverAlarms(nodes);
     await this.discoverCameras(nodes);
+    await this.discoverSensors(nodes);
   }
 
   private async discoverShutters(nodes: Array<FBXHomeNode>) {
@@ -178,7 +187,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     }
     this.log.info('Get shutters/blinds');
     const shutters: Array<FBXBlind> = this.shuttersController.getBlinds(nodes);
-    this.log.info('Found from Freebox ' + shutters.length + 'shutters');
+    this.log.info(`Found ${shutters.length} shutter(s) in Freebox nodes.`);
     // let createdShutters: Array<FBXShutters> = [];
     for (const [_index, shutter] of shutters.entries()) {
       const uuid = this.api.hap.uuid.generate(shutter.nodeid + shutter.displayName);
@@ -226,6 +235,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
 
         // link the accessory to your platform
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        this.accessories.push(accessory);
       }
       await sleep(1000, '');
     }
@@ -236,6 +246,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
       throw new Error('Can\'t discover devices - Freebox Alarm Controller not instanciated');
     }
     const alarms: Array<AlarmInstance> = this.alarmController.getAlarms(nodes);
+    this.log.info(`Found ${alarms.length} alarm(s) in Freebox nodes.`);
 
     if (alarms.length > 0) {
       for (const alarmInstance of alarms) {
@@ -278,8 +289,11 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
 
           // link the accessory to your platform
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          this.accessories.push(accessory);
         }
       }
+    } else {
+      this.log.info('No Freebox alarms discovered.');
     }
   }
 
@@ -287,49 +301,75 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     if (this.cameraController === null) {
       throw new Error('Can\'t discover devices - Freebox Camera Controller not instanciated');
     }
-    const cameras: Array<FBXCameraInstance> = this.cameraController.getCameras(nodes);
+    const cameras: Array<FBXCameraInstance> = await this.cameraController.getCameras(nodes);
+    this.log.info(`Found ${cameras.length} camera(s) in Freebox nodes.`);
     if (cameras.length > 0) {
       for (const cameraInstance of cameras) {
         const uuid = this.api.hap.uuid.generate(cameraInstance.id + cameraInstance.node_data.name);
         const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
         if (existingAccessory) {
-          // the accessory already exists
-          this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
-          
-          // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. e.g.:
+          this.log.info('Restoring existing camera accessory from cache:', existingAccessory.displayName, 'uuid=', existingAccessory.UUID);
           existingAccessory.context.device = cameraInstance;
           this.api.updatePlatformAccessories([existingAccessory]);
-
-          // create the accessory handler for the restored accessory
           new FBXCamera(this,
             existingAccessory,
             this.cameraController);
-
-          // // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, e.g.:
-          // // remove platform accessories when no longer present
-          // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-          // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
         } else {
-          // the accessory does not yet exist, so we need to create it
-          this.log.info('Adding new accessory:', cameraInstance.node_data.name + cameraInstance.node_data.label);
-
-          // create a new accessory
-          const accessory = new this.api.platformAccessory(cameraInstance.node_data.label, uuid, this.api.hap.Categories.IP_CAMERA);
-
-          // store a copy of the device object in the `accessory.context`
-          // the `context` property can be used to store any data about the accessory you may need
+          this.log.info('Adding new camera accessory:', cameraInstance.node_data.name + ' ' + cameraInstance.node_data.label);
+          const accessory = new this.api.platformAccessory(cameraInstance.node_data.label, uuid);
           accessory.context.device = cameraInstance;
-
-          // create the accessory handler for the newly created accessory
-          // this is imported from `platformAccessory.ts`
           new FBXCamera(this,
             accessory,
             this.cameraController);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          this.accessories.push(accessory);
+          this.log.info('Registered new camera accessory:', accessory.displayName, 'uuid=', accessory.UUID);
+        }
+      }
+    } else {
+      this.log.info('No Freebox cameras discovered.');
+    }
+  }
+
+  private async discoverSensors(nodes: Array<FBXHomeNode>) {
+    if (this.sensorsController === null) {
+      throw new Error('Can\'t discover devices - Freebox Sensors Controller not instantiated');
+    }
+    const sensors: Array<SensorInstance> = this.sensorsController.getSensors(nodes);
+    this.log.info(`Found ${sensors.length} sensor(s) in Freebox nodes.`);
+    if (sensors.length > 0) {
+      for (const sensorInstance of sensors) {
+        const uuid = this.api.hap.uuid.generate(sensorInstance.sensorNode.id + sensorInstance.sensorNode.name);
+        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+        if (existingAccessory) {
+          // the accessory already exists
+          this.log.info('Restoring existing sensor accessory from cache:', existingAccessory.displayName, ' uuid=', existingAccessory.UUID);
+
+          existingAccessory.context.device = sensorInstance;
+          this.api.updatePlatformAccessories([existingAccessory]);
+
+          new FBXSecuritySensors(this,
+            existingAccessory,
+            this.sensorsController);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new sensor accessory:', sensorInstance.sensorNode.name + ' ' + sensorInstance.sensorNode.label);
+
+          const accessory = new this.api.platformAccessory(sensorInstance.sensorNode.label, uuid);
+
+          accessory.context.device = sensorInstance;
+
+          new FBXSecuritySensors(this,
+            accessory,
+            this.sensorsController);
 
           // link the accessory to your platform
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          this.accessories.push(accessory);
         }
       }
+    } else {
+      this.log.info('No Freebox sensors discovered.');
     }
   }
 }

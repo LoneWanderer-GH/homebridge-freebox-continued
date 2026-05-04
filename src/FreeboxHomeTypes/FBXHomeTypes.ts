@@ -116,7 +116,9 @@ export interface FBXCameraProps {
     Login: string;
     Mac: string;
     Pass: string;
-    Strteam: string;
+    Stream?: string;
+    // Strteam?: string;
+    // stream?: string;
 }
 export interface FBXHomeNode {
     // Id of the HomeAdapter this node is connected to.

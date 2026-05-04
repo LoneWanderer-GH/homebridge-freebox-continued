@@ -1,4 +1,5 @@
 import { CharacteristicSetCallback, CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import { PluginLogger } from './PluginLogger.js';
 
 import {
   AlarmController, AlarmKind as FBXAlarmKind,
@@ -17,6 +18,8 @@ import { FreeboxPlatform } from './platform.js';
  * Each accessory may expose multiple services of different service types.
  */
 export class FBXAlarm {
+  private readonly logger: PluginLogger;
+
   private service: Service;
   private currentState: CharacteristicValue;
   private currentTargetState: CharacteristicValue;
@@ -33,6 +36,8 @@ export class FBXAlarm {
     private readonly alarmController: AlarmController,
     // TODO: add sensors !
   ) {
+    this.logger = new PluginLogger(this.platform.log, 'FBXAlarm');
+
     this.alarmRefreshRateMilliSeconds = this.platform.config.alarmRefreshRateMilliSeconds;
     this.currentState = this.platform.Characteristic.SecuritySystemCurrentState.DISARMED;
     this.currentTargetState = this.platform.Characteristic.SecuritySystemTargetState.DISARM;
@@ -117,8 +122,8 @@ export class FBXAlarm {
     //   motionSensorOneService.updateCharacteristic(this.platform.Characteristic.MotionDetected, motionDetected);
     //   motionSensorTwoService.updateCharacteristic(this.platform.Characteristic.MotionDetected, !motionDetected);
 
-    //   this.debug('Triggering motionSensorOneService:', motionDetected);
-    //   this.debug('Triggering motionSensorTwoService:', !motionDetected);
+    //   this.logger.debug('Triggering motionSensorOneService:', motionDetected);
+    //   this.logger.debug('Triggering motionSensorTwoService:', !motionDetected);
     // }, 10000);
     // setInterval(async () => {
     //   const currentAlarmKindTarget: FBXAlarmKind = await this.alarmController.getAlarmKind();
@@ -130,47 +135,26 @@ export class FBXAlarm {
     // setInterval(async () => {
     //   const alarmState: FBXAlarmState | null = await this.alarmController.getAlarmState();
     //   if (alarmState !== null) {
-    //     //this.debug(`FBX alarm state ${alarmState} converting to ${this.currentStateF2H[alarmState]}`);
+    //     //this.logger.debug(`FBX alarm state ${alarmState} converting to ${this.currentStateF2H[alarmState]}`);
     //     this.currentState = this.currentStateF2H[alarmState];
     //   }
     // }, this.alarmRefreshRateMilliSeconds);
     setInterval(async () => {
-      const alarmInfo: FBXAlarmInfo = await this.alarmController.getAlarmKindAndState(this.alarmInstance);
-      this.currentTargetState = this.currentTargetStateF2H[alarmInfo.kind];
-      this.currentState = this.currentStateF2H[alarmInfo.state];
+      try {
+        const alarmInfo: FBXAlarmInfo = await this.alarmController.getAlarmKindAndState(this.alarmInstance);
+        this.currentTargetState = this.currentTargetStateF2H[alarmInfo.kind];
+        this.currentState = this.currentStateF2H[alarmInfo.state];
+      } catch (error) {
+        this.logger.error('Error updating alarm state:', error);
+      }
     }, this.alarmRefreshRateMilliSeconds);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private debug(s: string, ...parameters: any[]): void {
-    this.platform.log.debug(`FBXAlarm -> ${s}`, parameters);
-  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private info(s: string, ...parameters: any[]): void {
-    this.platform.log.info(`FBXAlarm -> ${s}`, parameters);
-  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private warn(s: string, ...parameters: any[]): void {
-    this.platform.log.warn(`FBXAlarm -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private error(s: string, ...parameters: any[]): void {
-    this.platform.log.error(`FBXAlarm -> ${s}`, parameters);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private success(s: string, ...parameters: any[]): void {
-    this.platform.log.success(`FBXAlarm -> ${s}`, parameters);
-  }
-
-  /**
-   * Handle requests to get the current value of the "Security System Current State" characteristic
-   */
   async getSecuritySystemTargetState(): Promise<CharacteristicValue> {
-    this.debug(`Triggered GET getSecuritySystemTargetState -> returning ${this.currentTargetState}`);
+    this.logger.debug(`Triggered GET getSecuritySystemTargetState -> returning ${this.currentTargetState}`);
     return this.currentTargetState;
   }
 
@@ -178,54 +162,59 @@ export class FBXAlarm {
    * Handle requests to get the current value of the "Security System Target State" characteristic
    */
   async setSecuritySystemTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
-    this.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
-    let status: boolean = false;
-    switch (value) {
-      case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
-        // {
-        this.debug('DISARM');
-        status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.error('Asked DISARM, but it failed ?!');
-        }
-        break;
-      // }
-      case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
-        // {
-        this.debug('AWAY_ARM');
-        status = await this.alarmController.setMainAlarm(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.error('Asked AWAY_ARM, but it failed ?!');
-        }
-        break;
-      // }
-      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
-      case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
-        // {
-        this.debug('STAY_ARM OR NIGHT_ARM');
-        status = await this.alarmController.setNightAlarm(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
-        }
-        break;
-      // }
-      default:
-        throw new Error('WTF BBQ');
+    this.logger.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
+    try {
+      let status: boolean = false;
+      switch (value) {
+        case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
+          // {
+          this.logger.debug('DISARM');
+          status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
+          if (status) {
+            this.currentTargetState = value;
+          } else {
+            this.logger.error('Asked DISARM, but it failed ?!');
+          }
+          break;
+        // }
+        case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
+          // {
+          this.logger.debug('AWAY_ARM');
+          status = await this.alarmController.setMainAlarm(this.alarmInstance);
+          if (status) {
+            this.currentTargetState = value;
+          } else {
+            this.logger.error('Asked AWAY_ARM, but it failed ?!');
+          }
+          break;
+        // }
+        case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
+        case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
+          // {
+          this.logger.debug('STAY_ARM OR NIGHT_ARM');
+          status = await this.alarmController.setNightAlarm(this.alarmInstance);
+          if (status) {
+            this.currentTargetState = value;
+          } else {
+            this.logger.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
+          }
+          break;
+        // }
+        default:
+          throw new Error('WTF BBQ');
+      }
+      callback(null);
+    } catch (error) {
+      this.logger.error('Error setting alarm target state:', error);
+      callback(error as Error);
     }
-    callback(null);
   }
 
   /**
    * Handle requests to get the current value of the "Security System Current State" characteristic
    */
   async getSecuritySystemCurrentState(): Promise<CharacteristicValue> {
-    this.debug(`Triggered getSecuritySystemCurrentState -> returning ${this.currentState}`);
+    this.logger.debug(`Triggered getSecuritySystemCurrentState -> returning ${this.currentState}`);
     return this.currentState;
   }
 
