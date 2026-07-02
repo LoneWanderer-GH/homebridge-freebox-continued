@@ -77,6 +77,7 @@ export class FreeboxController {
     } else {
       this.logger.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
       this.logger.warn(JSON.stringify(apiVersionData));
+      // eslint-disable-next-line
       const _finished = await sleep(this.apiInfoRetryDelayMs, '');
       return await this.getActualApiUrl();
     }

@@ -127,28 +127,28 @@ export class AlarmController {
     if (result && data.success) {
       alarmState = data.result.value as AlarmState; //AlarmState[data.result.value as keyof typeof AlarmState];
       switch (alarmState) {
-        //if (value === 'alarm1_armed' || value === 'alarm1_arming') {
-        case AlarmState.MAIN_alarm_armed:
-          alarmTargetKind = AlarmKind.MAIN_ALARM;
-          break;
-        case AlarmState.MAIN_alarm_arming:
-          alarmTargetKind = AlarmKind.MAIN_ALARM;
-          alarm.isArming = true;
-          break;
+      //if (value === 'alarm1_armed' || value === 'alarm1_arming') {
+      case AlarmState.MAIN_alarm_armed:
+        alarmTargetKind = AlarmKind.MAIN_ALARM;
+        break;
+      case AlarmState.MAIN_alarm_arming:
+        alarmTargetKind = AlarmKind.MAIN_ALARM;
+        alarm.isArming = true;
+        break;
         // } else if (value === 'alarm2_armed' || value === 'alarm2_arming') {
-        case AlarmState.NIGHT_alarm_armed:
-          alarmTargetKind = AlarmKind.NIGHT_ALARM;
-          break;
-        case AlarmState.NIGHT_alarm_arming:
-          alarmTargetKind = AlarmKind.NIGHT_ALARM;
-          alarm.isArming = true;
-          break;
-        case AlarmState.idle:
-          alarmTargetKind = AlarmKind.OFF;
-          alarm.isArming = false;
-          break;
-        default:
-          this.logger.error(`WTF ?! Received Alarm state ${JSON.stringify(data.result)} => ${alarmState}`);
+      case AlarmState.NIGHT_alarm_armed:
+        alarmTargetKind = AlarmKind.NIGHT_ALARM;
+        break;
+      case AlarmState.NIGHT_alarm_arming:
+        alarmTargetKind = AlarmKind.NIGHT_ALARM;
+        alarm.isArming = true;
+        break;
+      case AlarmState.idle:
+        alarmTargetKind = AlarmKind.OFF;
+        alarm.isArming = false;
+        break;
+      default:
+        this.logger.error(`WTF ?! Received Alarm state ${JSON.stringify(data.result)} => ${alarmState}`);
       }
       //
     } else {
@@ -187,13 +187,13 @@ export class AlarmController {
     kind: AlarmKind): Promise<boolean> {
     this.logger.debug('setAlarm');
     switch (kind) {
-      case AlarmKind.MAIN_ALARM:
-      case AlarmKind.NIGHT_ALARM:
-        break;
-      default:
-        // this.logger.error(`Cant' set alarm for ${kind}`);
-        // return false;
-        throw Error('Wrong service called, should use setAlarmDisabled');
+    case AlarmKind.MAIN_ALARM:
+    case AlarmKind.NIGHT_ALARM:
+      break;
+    default:
+      // this.logger.error(`Cant' set alarm for ${kind}`);
+      // return false;
+      throw Error('Wrong service called, should use setAlarmDisabled');
     }
     const activable: boolean = await this.checkAlarmActivable(alarm, kind);
     if (activable && alarm.alarmNode) {

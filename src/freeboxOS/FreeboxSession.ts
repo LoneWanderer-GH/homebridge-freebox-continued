@@ -167,6 +167,7 @@ export class FreeboxSession {
         const sessionToken = await this.session(token, accessData.challenge);
         return [accessData.challenge, sessionToken];
       } else {
+        // eslint-disable-next-line
         const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
         this.logger.warn('Challenge or token is null');
         return await this.start(token, trackId);
@@ -178,6 +179,7 @@ export class FreeboxSession {
       this.sessionAttemptCount = 0;
       return [null, null];
     } else if (accessData.status === FBXAuthorizationStatus.Pending) {
+      // eslint-disable-next-line
       const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
       if (this.accessAttemptCount < Number.MAX_SAFE_INTEGER) {
         this.accessAttemptCount++;
@@ -210,23 +212,23 @@ export class FreeboxSession {
     // const status: FBXAuthorizationStatus = FBXAuthorizationStatus[body.result.status as keyof typeof FBXAuthorizationStatus];
     const status: FBXAuthorizationStatus|undefined = convertStringToEnum(body.result.status);
     switch (status) {
-      case FBXAuthorizationStatus.Granted:  // body.result.status == 'granted'
-        return { status: status, challenge: body.result.challenge }; // 1 GRANTED
-      case FBXAuthorizationStatus.Pending: // body.result.status == 'pending'
-        this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        this.logger.warn('Pending access, check your Freebox device and manually accept the app request');
-        this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        return { status: status, challenge: null }; // 2 PENDING
-      case FBXAuthorizationStatus.Denied:
-      case FBXAuthorizationStatus.Canceled:
-      case FBXAuthorizationStatus.Timeout:
-        this.logger.warn('Access status: ' + status);
-        return { status: status, challenge: null }; // 0 DENIED
-      default:
-        this.logger.error(`Status not recognized ${status}`);
-        this.logger.error(`    Reply was: ${JSON.stringify(body)}`);
-        // return { status: FBXAuthorizationStatus.Denied, challenge: null }; // 0 DENIED
-        throw new Error(`Status not recognized ${status} (Reply was: ${JSON.stringify(body)})`);
+    case FBXAuthorizationStatus.Granted:  // body.result.status == 'granted'
+      return { status: status, challenge: body.result.challenge }; // 1 GRANTED
+    case FBXAuthorizationStatus.Pending: // body.result.status == 'pending'
+      this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      this.logger.warn('Pending access, check your Freebox device and manually accept the app request');
+      this.logger.warn('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
+      return { status: status, challenge: null }; // 2 PENDING
+    case FBXAuthorizationStatus.Denied:
+    case FBXAuthorizationStatus.Canceled:
+    case FBXAuthorizationStatus.Timeout:
+      this.logger.warn('Access status: ' + status);
+      return { status: status, challenge: null }; // 0 DENIED
+    default:
+      this.logger.error(`Status not recognized ${status}`);
+      this.logger.error(`    Reply was: ${JSON.stringify(body)}`);
+      // return { status: FBXAuthorizationStatus.Denied, challenge: null }; // 0 DENIED
+      throw new Error(`Status not recognized ${status} (Reply was: ${JSON.stringify(body)})`);
     }
   }
 
@@ -254,6 +256,7 @@ export class FreeboxSession {
       const body = fbxResult.data as FBXLoginSessionReply;
       if (body.success === false) {
         this.logger.warn('Unable to start session');
+        // eslint-disable-next-line
         const _res = await sleep(FreeboxSession.RETRY_TIMEOUT, '');
         if (this.sessionAttemptCount < FreeboxSession.RETRY_COUNT) {
           this.sessionAttemptCount++;

@@ -10,7 +10,7 @@ import { PluginLogger } from '../PluginLogger.js';
 import os from 'os';
 import readline from 'readline';
 import { Writable } from 'stream';
-import { StreamingDelegate } from './streamingDelegate';
+import { StreamingDelegate } from './streamingDelegate.js';
 
 type FfmpegProgress = {
   frame: number;
@@ -156,5 +156,5 @@ export class FfmpegProcess {
   }
 
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
 }

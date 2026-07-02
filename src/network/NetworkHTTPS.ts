@@ -114,23 +114,24 @@ export class Network {
   }
 
   private handleHTTPError500(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. ${response.statusText}`);
+    throw new Error(`${response.status}. ${_errortext} ${response.statusText}`);
   }
 
   private handleHTTPError501(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. ${response.statusText}`);
+    throw new Error(`${response.status}. ${_errortext} ${response.statusText}`);
   }
 
   private handleHTTPError502(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. ${response.statusText}`);
+    throw new Error(`${response.status}. ${_errortext} ${response.statusText}`);
   }
 
   private handleHTTPError503(response: NodeFetchResponse, _errortext: string) {
-    throw new Error(`${response.status}. ${response.statusText}`);
+    throw new Error(`${response.status}. ${_errortext} ${response.statusText}`);
   }
 
   private async handleHTTPError504(_response: NodeFetchResponse, _errortext: string) {
-    // throw new Error(`${response.status}. ${response.statusText}`);
+    // throw new Error(`${response.status}. ${_errortext} ${response.statusText}`);
+    this.logger.debug(`504 error handling: ${_response.status}. ${_errortext} ${_response.statusText}`);
     this.logger.warn('Force a delay');
     await this.delay(5000);
   }

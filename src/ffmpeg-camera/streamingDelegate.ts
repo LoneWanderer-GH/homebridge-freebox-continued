@@ -504,18 +504,18 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   handleStreamRequest(request: StreamingRequest, callback: StreamRequestCallback): void {
     this.logger.debug('Received stream request of type ' + request.type, this.cameraName);
     switch (request.type) {
-      case StreamRequestTypes.START:
-        this.startStream(request, callback);
-        break;
-      case StreamRequestTypes.RECONFIGURE:
-        this.logger.debug('Received request to reconfigure: ' + request.video.width + ' x ' + request.video.height + ', ' +
+    case StreamRequestTypes.START:
+      this.startStream(request, callback);
+      break;
+    case StreamRequestTypes.RECONFIGURE:
+      this.logger.debug('Received request to reconfigure: ' + request.video.width + ' x ' + request.video.height + ', ' +
                     request.video.fps + ' fps, ' + request.video.max_bit_rate + ' kbps (Ignored)', this.cameraName, this.videoConfig.debug);
-        callback();
-        break;
-      case StreamRequestTypes.STOP:
-        this.stopStream(request.sessionID);
-        callback();
-        break;
+      callback();
+      break;
+    case StreamRequestTypes.STOP:
+      this.stopStream(request.sessionID);
+      callback();
+      break;
     }
   }
 
@@ -547,5 +547,5 @@ export class StreamingDelegate implements CameraStreamingDelegate {
   }
 
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
 }

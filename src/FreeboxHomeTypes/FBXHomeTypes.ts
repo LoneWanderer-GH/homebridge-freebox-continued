@@ -59,6 +59,7 @@ export interface FBXHomeNodeEndpoint {
         unit: string;
     };
 }
+// eslint-disable-next-line
 export interface FBXHomeNodeLink {
 
 }

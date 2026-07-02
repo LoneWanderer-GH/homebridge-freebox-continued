@@ -64,7 +64,7 @@ export class FreeboxRequest {
     };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
 
   async freeboxAuth(
     authInfo: FBXAuthInfo,
