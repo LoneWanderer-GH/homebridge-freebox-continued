@@ -1,5 +1,4 @@
 {
-  "private": true,
   "displayName": "Freebox Home Api",
   "name": "homebridge-freebox-continued",
   "version": "0.0.2",
@@ -14,7 +13,7 @@
     "url": "https://github.com/LoneWanderer-GH/homebridge-freebox-continued/issues"
   },
   "engines": {
-    "node": "^22.10.0 || ^24.0.0",
+    "node": ">=18.20.0",
     "homebridge": "^1.8.0 || ^2.0.0"
   },
   "main": "dist/index.js",
@@ -35,9 +34,7 @@
     "freebox delta"
   ],
   "dependencies": {
-  	"homebridge-lib": "^8.0.1",
     "ffmpeg-for-homebridge": "^2.1.1",
-    "https": "^1.0.0",
     "node-fetch": "^3.0.0",
     "pick-port": "^2.1.0"
   },

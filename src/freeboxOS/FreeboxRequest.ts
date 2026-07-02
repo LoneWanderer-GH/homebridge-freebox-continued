@@ -42,7 +42,7 @@ export class FreeboxRequest {
   private readonly logger: PluginLogger;
 
   // private freeboxSession: FreeboxSession;
-  public credentials: FBXSessionCredentials;
+  private credentials: FBXSessionCredentials;
 
   constructor(
     public readonly log: Logging,
@@ -52,7 +52,7 @@ export class FreeboxRequest {
     // private readonly apiUrl:string,
     private readonly freeboxSession: FreeboxSession,
   ) {
-    this.logger = new PluginLogger(this.log, 'DataNotUpdatedError');
+    this.logger = new PluginLogger(this.log, 'FreeboxRequest');
 
     // this.freeboxSession = new FreeboxSession(this.log, this.network, this.apiUrl); // this.freeboxAddress, this.freeboxApiVersion);
 

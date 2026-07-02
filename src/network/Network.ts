@@ -2,9 +2,16 @@ import { Logging } from 'homebridge';
 import { PluginLogger } from '../PluginLogger.js';
 
 import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 import https from 'https';
 import fetch, { RequestInit as Request, Response } from 'node-fetch';
 // import axios, { AxiosRequestConfig as Request, AxiosResponse as Response } from 'axios';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+// FBXCerts.crt is located two levels up from src/network/ at the plugin root
+const FBXCERTS_PATH = path.resolve(__dirname, '..', '..', 'FBXCerts.crt');
 
 export interface FBXRequestResult {
   status_code: number | null;
@@ -24,7 +31,7 @@ export class Network {
     this.logger = new PluginLogger(this.log, 'Network');
 
     if (useHTTPS) {
-      this.ca = fs.readFileSync('FBXCerts.crt');
+      this.ca = fs.readFileSync(FBXCERTS_PATH);
       this.httpsAgent = new https.Agent({
         ca: this.ca,
         keepAlive: true,

@@ -26,6 +26,8 @@ export interface FBXAPI {
 }
 
 
+const MAX_API_DISCOVERY_RETRIES = 10;
+
 export class FreeboxController {
   private readonly logger: PluginLogger;
 
@@ -33,6 +35,7 @@ export class FreeboxController {
   // private freeboxRequest!: FreeboxRequest;
   private apiInfoUrl: string;
   private apiInfoRetryDelayMs: number = 2000;
+  private apiDiscoveryAttempts: number = 0;
   public apiInfo: FBXApiVersion | null = null;
 
   constructor(
@@ -65,6 +68,7 @@ export class FreeboxController {
       10000, // 10 second timeout for API discovery
     );
     if (apiVersionData.status_code === 200) {
+      this.apiDiscoveryAttempts = 0;
       this.logger.success('Freebox API configuration ' + JSON.stringify(apiVersionData));
       this.apiInfo = apiVersionData.data as FBXApiVersion;
       const majorVersion = this.apiInfo.api_version.split('.')[0];
@@ -75,7 +79,12 @@ export class FreeboxController {
         webSocketurl: `wss://${this.apiInfo.api_domain}:${this.apiInfo.https_port}${this.apiInfo.api_base_url}v${majorVersion}/ws`,
       };
     } else {
-      this.logger.warn(`No valid response from ${this.apiInfoUrl} ... retry in ${this.apiInfoRetryDelayMs}`);
+      this.apiDiscoveryAttempts++;
+      if (this.apiDiscoveryAttempts >= MAX_API_DISCOVERY_RETRIES) {
+        this.apiDiscoveryAttempts = 0;
+        throw new Error(`Could not reach Freebox API at ${this.apiInfoUrl} after ${MAX_API_DISCOVERY_RETRIES} attempts. Check freeBoxAddress in config.`);
+      }
+      this.logger.warn(`No valid response from ${this.apiInfoUrl} ... retry ${this.apiDiscoveryAttempts}/${MAX_API_DISCOVERY_RETRIES} in ${this.apiInfoRetryDelayMs}ms`);
       this.logger.warn(JSON.stringify(apiVersionData));
       // eslint-disable-next-line
       const _finished = await sleep(this.apiInfoRetryDelayMs, '');

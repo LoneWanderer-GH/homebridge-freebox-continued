@@ -1,6 +1,11 @@
 # Ignore compiled code
 dist
 
+# Local test Homebridge config (may contain tokens)
+test/hbConfig/freebox-auth.json
+test/hbConfig/persist/
+test/hbConfig/accessories/
+
 # ------------- Defaults ------------- #
 
 # Logs
