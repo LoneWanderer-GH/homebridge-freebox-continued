@@ -84,7 +84,8 @@ export class FreeboxController {
         this.apiDiscoveryAttempts = 0;
         throw new Error(`Could not reach Freebox API at ${this.apiInfoUrl} after ${MAX_API_DISCOVERY_RETRIES} attempts. Check freeBoxAddress in config.`);
       }
-      this.logger.warn(`No valid response from ${this.apiInfoUrl} ... retry ${this.apiDiscoveryAttempts}/${MAX_API_DISCOVERY_RETRIES} in ${this.apiInfoRetryDelayMs}ms`);
+      this.logger.warn(`No valid response from ${this.apiInfoUrl} ... ' +
+        'retry ${this.apiDiscoveryAttempts}/${MAX_API_DISCOVERY_RETRIES} in ${this.apiInfoRetryDelayMs}ms`);
       this.logger.warn(JSON.stringify(apiVersionData));
       // eslint-disable-next-line
       const _finished = await sleep(this.apiInfoRetryDelayMs, '');
