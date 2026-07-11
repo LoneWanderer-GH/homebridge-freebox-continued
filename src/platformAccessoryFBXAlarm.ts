@@ -150,7 +150,7 @@ export class FBXAlarm {
     }, this.alarmRefreshRateMilliSeconds);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
 
 
   async getSecuritySystemTargetState(): Promise<CharacteristicValue> {
@@ -165,36 +165,36 @@ export class FBXAlarm {
     this.logger.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
     let status: boolean = false;
     switch (value) {
-      case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
-        this.logger.debug('DISARM');
-        status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.logger.error('Asked DISARM, but it failed ?!');
-        }
-        break;
-      case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
-        this.logger.debug('AWAY_ARM');
-        status = await this.alarmController.setMainAlarm(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.logger.error('Asked AWAY_ARM, but it failed ?!');
-        }
-        break;
-      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
-      case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
-        this.logger.debug('STAY_ARM OR NIGHT_ARM');
-        status = await this.alarmController.setNightAlarm(this.alarmInstance);
-        if (status) {
-          this.currentTargetState = value;
-        } else {
-          this.logger.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
-        }
-        break;
-      default:
-        throw new Error(`Unexpected SecuritySystemTargetState value: ${value}`);
+    case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
+      this.logger.debug('DISARM');
+      status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
+      if (status) {
+        this.currentTargetState = value;
+      } else {
+        this.logger.error('Asked DISARM, but it failed ?!');
+      }
+      break;
+    case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
+      this.logger.debug('AWAY_ARM');
+      status = await this.alarmController.setMainAlarm(this.alarmInstance);
+      if (status) {
+        this.currentTargetState = value;
+      } else {
+        this.logger.error('Asked AWAY_ARM, but it failed ?!');
+      }
+      break;
+    case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
+    case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
+      this.logger.debug('STAY_ARM OR NIGHT_ARM');
+      status = await this.alarmController.setNightAlarm(this.alarmInstance);
+      if (status) {
+        this.currentTargetState = value;
+      } else {
+        this.logger.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
+      }
+      break;
+    default:
+      throw new Error(`Unexpected SecuritySystemTargetState value: ${value}`);
     }
   }
 

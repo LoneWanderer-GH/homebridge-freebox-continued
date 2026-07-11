@@ -58,6 +58,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     this.Characteristic = api.hap.Characteristic;
 
     this.authFilePath = path.join(this.api.user.storagePath(), 'freebox-auth.json');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const _freeboxApiVersion: string = this.config.apiVersion;
     const freeboxIPAddress: string = this.config.freeBoxAddress;
     //const shuttersRefreshRateMilliSeconds:string = this.config.shuttersRefreshRateMilliSeconds;
@@ -189,6 +190,7 @@ export class FreeboxPlatform implements DynamicPlatformPlugin {
     const shutters: Array<FBXBlind> = this.shuttersController.getBlinds(nodes);
     this.log.info(`Found ${shutters.length} shutter(s) in Freebox nodes.`);
     // let createdShutters: Array<FBXShutters> = [];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [_index, shutter] of shutters.entries()) {
       const uuid = this.api.hap.uuid.generate(shutter.nodeid + shutter.displayName);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);

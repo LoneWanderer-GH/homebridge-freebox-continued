@@ -8,7 +8,7 @@ import {
 } from 'homebridge';
 import { PluginLogger } from './PluginLogger.js';
 
-import { setImmediate, setTimeout as sleep } from 'timers/promises';
+import { setImmediate } from 'timers/promises';
 
 import { FreeboxPlatform } from './platform.js';
 

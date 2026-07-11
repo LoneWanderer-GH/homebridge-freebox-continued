@@ -1,7 +1,7 @@
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
 import { PluginLogger } from './PluginLogger.js';
 
-import { SensorsController, SensorInstance, SensorType } from './controllers/SensorsController.js';
+import { SensorsController, SensorInstance } from './controllers/SensorsController.js';
 import { FreeboxPlatform } from './platform.js';
 import { FBXHomeNodeCategory } from './FreeboxHomeTypes/FBXHomeTypes.js';
 
