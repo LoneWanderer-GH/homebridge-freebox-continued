@@ -61,8 +61,8 @@ export class FBXCamera /*implements AccessoryPlugin*/ {
       name: this.cameraInstance.node_data.label,
       manufacturer : 'Freebox',
       model : this.cameraInstance.node_data.type.labelDisplay || 'Freebox Camera',
-      serialNumber : String(this.cameraInstance.id),
-      firmwareRevision : '',
+      serialNumber : `FBX-CAM-${this.cameraInstance.id}`,
+      firmwareRevision : '1.0.0',
       motion : false,
       videoConfig : videoConfig,
     };
