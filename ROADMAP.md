@@ -45,8 +45,10 @@ These items must be resolved before publishing to npm.
 
 ### 🟡 Correctness
 
-- [ ] Replace deprecated `CharacteristicSetCallback` with async `onSet` handlers (Homebridge v2 API)
-- [ ] Replace hardcoded `'Default-Manufacturer'` / `'Default-Model'` / `'Default-Serial'` with real Freebox node data where available
+- [x] Replace deprecated `CharacteristicSetCallback` with async `onSet` handlers (Homebridge v2 API)
+- [x] Fix `serialNumber` in `FBXCamera`: `String(id)` → `'FBX-CAM-${id}'` (single-char value rejected by HomeKit)
+- [x] Fix `firmwareRevision` in `FBXCamera`: empty string `''` → `'1.0.0'` (empty value rejected by HomeKit)
+- [ ] Replace hardcoded `'Default-Manufacturer'` / `'Default-Model'` / `'Default-Serial'` in alarm/shutter/sensor accessories with real Freebox node data
 - [x] Fix `FreeboxRequest` class logger namespace name (was `'DataNotUpdatedError'`, now `'FreeboxRequest'`)
 
 ---

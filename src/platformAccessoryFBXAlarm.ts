@@ -1,4 +1,4 @@
-import { CharacteristicSetCallback, CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
+import { CharacteristicValue, PlatformAccessory, Service } from 'homebridge';
 import { PluginLogger } from './PluginLogger.js';
 
 import {
@@ -161,52 +161,40 @@ export class FBXAlarm {
   /**
    * Handle requests to get the current value of the "Security System Target State" characteristic
    */
-  async setSecuritySystemTargetState(value: CharacteristicValue, callback: CharacteristicSetCallback) {
+  async setSecuritySystemTargetState(value: CharacteristicValue): Promise<void> {
     this.logger.debug(`Triggered SET SecuritySystemTargetState: ${value}`);
-    try {
-      let status: boolean = false;
-      switch (value) {
-        case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
-          // {
-          this.logger.debug('DISARM');
-          status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.logger.error('Asked DISARM, but it failed ?!');
-          }
-          break;
-        // }
-        case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
-          // {
-          this.logger.debug('AWAY_ARM');
-          status = await this.alarmController.setMainAlarm(this.alarmInstance);
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.logger.error('Asked AWAY_ARM, but it failed ?!');
-          }
-          break;
-        // }
-        case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
-        case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
-          // {
-          this.logger.debug('STAY_ARM OR NIGHT_ARM');
-          status = await this.alarmController.setNightAlarm(this.alarmInstance);
-          if (status) {
-            this.currentTargetState = value;
-          } else {
-            this.logger.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
-          }
-          break;
-        // }
-        default:
-          throw new Error('WTF BBQ');
-      }
-      callback(null);
-    } catch (error) {
-      this.logger.error('Error setting alarm target state:', error);
-      callback(error as Error);
+    let status: boolean = false;
+    switch (value) {
+      case this.platform.Characteristic.SecuritySystemTargetState.DISARM:
+        this.logger.debug('DISARM');
+        status = await this.alarmController.setAlarmDisabled(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.logger.error('Asked DISARM, but it failed ?!');
+        }
+        break;
+      case this.platform.Characteristic.SecuritySystemTargetState.AWAY_ARM:
+        this.logger.debug('AWAY_ARM');
+        status = await this.alarmController.setMainAlarm(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.logger.error('Asked AWAY_ARM, but it failed ?!');
+        }
+        break;
+      case this.platform.Characteristic.SecuritySystemTargetState.STAY_ARM:
+      case this.platform.Characteristic.SecuritySystemTargetState.NIGHT_ARM:
+        this.logger.debug('STAY_ARM OR NIGHT_ARM');
+        status = await this.alarmController.setNightAlarm(this.alarmInstance);
+        if (status) {
+          this.currentTargetState = value;
+        } else {
+          this.logger.error('Asked STAY_ARM OR NIGHT_ARM, but it failed ?!');
+        }
+        break;
+      default:
+        throw new Error(`Unexpected SecuritySystemTargetState value: ${value}`);
     }
   }
 
